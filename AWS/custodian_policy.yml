@@ -1,0 +1,14 @@
+# custodian policy 
+policy:
+  -name: sandbox-Lifecycle
+  resource: aws.ec2
+  description:"ปิด cloud server ec2 ที่ไม่ได้ใช้เกิน 14วัน "
+  filters:
+    -"tag:Environment": sandbox
+    -type: instance-age
+    days: 14
+    actions:
+    - stop
+    -type: tag
+    key: Status
+    value: soft-deleted

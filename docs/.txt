@@ -1,0 +1,21 @@
+Automated Lifecycle
+
+    --Description
+
+
+
+
+
+        --Finance Logic  this project
+
+            -- services/roi_service.go
+                !Waste % = idle cost/total spend * 100
+                !ROI% =(savings-systems cost)/ systems cost * 100
+                !Payback Days= (Payback-1 if it's not break-even yet)
+
+            --  services/budget_service.go
+                !group cost according  owner field of the resource
+                !Forecast End month=spendDay * 30
+                !Status ok/warning AlertAt%/critical (out for limit)
+
+            --  services/npv_service.go

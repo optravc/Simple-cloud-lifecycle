@@ -1,0 +1,31 @@
+version: '3.8'
+
+
+name: Simple-Cloud-Lifecycle
+
+services:
+  # ==============================
+  # 1. ส่วนของ Backend (Go)
+  # ==============================
+  backend-api:
+    build: 
+      context: ./backend    
+      dockerfile: Dockerfile 
+    container_name: lifecycle_backend
+    ports:
+      - "8080:8000"         
+    restart: always
+
+  # ==============================
+  # 2. ส่วนของ Frontend (Next.js)
+  # ==============================
+  frontend-web:
+    build:
+      context: ./frontend   
+      dockerfile: Dockerfile
+    container_name: lifecycle_frontend
+    ports:
+      - "3000:3000"       
+    depends_on:
+      - backend-api        
+    restart: always
