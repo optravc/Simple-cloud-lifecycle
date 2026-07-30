@@ -24,9 +24,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin' # ใช้ Temurin เพื่อความเสถียรของ JRE
 
-      - name: Install Dependencies
-        run: npm install
-
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
         env:
