@@ -7,8 +7,11 @@ import Header from '@/layouts/header';
 import { CloudResource, SweepResponse } from '@/types/cloud';
 import ManageKpiCards from '@/components/manage/ManageKpiCards';
 import ResourceTable from '@/components/manage/ResourceTable';
-import LifecycleStatusCard from '@/components/LifecycleStatusCard';
+import LifecycleStatusCard from '@/components/manage/LifecycleStatusCard';
 import CostBreakdownCard from '@/components/dashboard/CostBreakdownCard';
+
+// 1. นำเข้า Component ใหม่
+import ConfirmSweepDialog from '@/components/manage/ConfirmSweepDialog';
 
 const drawerWidth = 260;
 
@@ -21,31 +24,48 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // คำนวณจำนวนเครื่อง Active ทั้งหมด
-  const activeCount = resources.length;
+  // 2. เพิ่ม State สำหรับควบคุม Dialog
+  const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
+  const activeResources = resources.filter(res => res.Status !== "TERMINATED" && res.Status !== "STOPPED");
+  const activeCount = activeResources.length;
 
-  // คำนวณเงินที่จะประหยัดได้จากเครื่องที่ Idle เกิน 14 วัน
+
   const potentialSavings = resources
-    .filter((res) => (res.day_idle ?? 0) > 14)
-    .reduce((sum, res) => sum + (res.cost_per_day ?? 0), 0);
+    .filter((res) => (res.DayIdle ?? 0) > 14)
+    .reduce((sum, res) => sum + (res.Costperday ?? 0), 0);
 
-  useEffect(() => {
+useEffect(() => {
     let cancelled = false;
 
     const loadResources = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/resources');
-        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+        // 1. ดึง Token จาก localStorage
+        const token = localStorage.getItem('accessToken');
+
+        // 2. แนบ Authorization Header ไปกับคำขอ
+        const res = await fetch('http://localhost:8000/api/resources', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            throw new Error('เซสชันหมดอายุหรือยังไม่ได้เข้าสู่ระบบ (401)');
+          }
+          throw new Error(`HTTP error: ${res.status}`);
+        }
 
         const data: CloudResource[] = await res.json();
         if (cancelled) return;
 
         setResources(data);
         setError(null);
-      } catch (err) {
+      } catch (err: any) {
         if (cancelled) return;
         console.error("Error fetching resources:", err);
-        setError('ตรวจสอบ server backend go port');
+        setError(err.message || 'ตรวจสอบ server backend go port');
       }
     };
 
@@ -55,22 +75,47 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [isSwept]);
+  
 
-  const handleScanAndSweep = async () => {
+  // ฟังก์ชันยิง API ไปที่ Backend ของ Go (/api/scan)
+  // 1. เพิ่มพารามิเตอร์ settings เข้าไปในฟังก์ชัน
+  const handleScanAndSweep = async (settings: { createAmi: boolean; amiName: string; retainEbs: boolean }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:8000/api/scan', { method: 'POST' });
+      // 2. เพิ่ม headers และ body สำหรับส่งข้อมูลแบบ POST ไปที่ Go
+      const res = await fetch('http://localhost:8000/api/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // แปลงตัวแปรให้ตรงกับ JSON Struct ที่ Go คาดหวังรับ
+          create_ami: settings.createAmi,
+          ami_name: settings.amiName,
+          retain_ebs: settings.retainEbs
+        })
+      });
+
       if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
       const data: SweepResponse = await res.json();
-      
-      setDeleteCount(data.Items_swept);
+
+      // เปลี่ยนจาก data.Items_swept เป็น data.items_swept
+      setDeleteCount(data.items_swept);
+
       setSaveCount(Number(data.saved_cost_daily ?? 0));
-      setSweptNames(data.Swept_details ?? []);
+
+
+      setSweptNames(data.swept_details ?? []);
+
       setIsSwept(prev => !prev);
+
+      setIsConfirmOpen(false);
+
     } catch (err) {
       console.error("Error running scan and sweep:", err);
       setError('ตรวจสอบ server backend go port');
+      setIsConfirmOpen(false);
     } finally {
       setLoading(false);
     }
@@ -79,10 +124,10 @@ export default function DashboardPage() {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8f9fa' }}>
       <Sidebar />
-      
+
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', width: `calc(100% - ${drawerWidth}px)` }}>
         <Header />
-        
+
         <Box sx={{ p: 4 }}>
           {error && (
             <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
@@ -91,30 +136,28 @@ export default function DashboardPage() {
           )}
 
           {isSwept && sweptNames.length > 0 && (
-            <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
-              ระบบพบความผิดปกติและ Soft-deleted เครื่องเหล่านี้แล้ว: {sweptNames.join(', ')}
+            <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
+              ระบบพบความผิดปกติและจัดการเครื่องเหล่านี้เรียบร้อยแล้ว: {sweptNames.join(', ')}
             </Alert>
           )}
-          
-          {/* ใช้ Manage KPI Cards Component สำหรับหน้า Manage */}
-          <ManageKpiCards 
-            activeCount={activeCount} 
-            potentialSavings={potentialSavings > 0 ? potentialSavings : saveCount} 
-            flaggedCount={deleteCount} 
+
+          <ManageKpiCards
+            activeCount={activeCount}
+            potentialSavings={potentialSavings > 0 ? potentialSavings : saveCount}
+            flaggedCount={deleteCount}
           />
 
           <Grid container spacing={3}>
-            {/* Table Area Component */}
-           <Grid size={{ xs: 12, md: 8 }}>
-              <ResourceTable 
-                resources={resources} 
-                loading={loading} 
-                onScanAndSweep={handleScanAndSweep} 
+            <Grid size={{ xs: 12, md: 8 }}>
+              {/* 4. เปลี่ยนให้ปุ่มส่งคำสั่งมาเปิดหน้าต่าง Dialog แทนการยิง API ทันที */}
+              <ResourceTable
+                resources={activeResources}
+                loading={loading}
+                onScanAndSweep={() => setIsConfirmOpen(true)}
               />
             </Grid>
 
-            {/* Lifecycle Status Card Component */}
-          <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <CostBreakdownCard />
                 <LifecycleStatusCard deleteCount={deleteCount} />
@@ -123,6 +166,15 @@ export default function DashboardPage() {
           </Grid>
         </Box>
       </Box>
+
+      {/* 5. เรียกใช้ Dialog Component ที่เราสร้างไว้ */}
+      <ConfirmSweepDialog
+        open={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleScanAndSweep}
+        loading={loading}
+      />
+
     </Box>
   );
 }

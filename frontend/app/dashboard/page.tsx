@@ -1,27 +1,32 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Box, Grid, Alert } from '@mui/material';
+import { useRouter } from 'next/navigation';
+import { Box, Grid, Alert, } from '@mui/material'; 
 import Sidebar from '@/layouts/sidebar';
 import Header from '@/layouts/header';
-import { CloudResource } from '@/types/cloud';
-
-import DashboardKpiCards from '@/components/dashboard/KpiCards'; 
+import DashboardKpiCards from '@/components/dashboard/KpiCards';
 import ChargesTable from '@/components/dashboard/ChargesTable';
-import CostBreakdownCard from '@/components/dashboard/CostBreakdownCard';
+import CostBreakdownCard, { PieData } from '@/components/dashboard/CostBreakdownCard'; // <-- นำเข้า PieData
+import { fetchWithAuth } from '@/lib/fetchWithAuth';
 
 const drawerWidth = 260;
 
 export default function DashboardPage() {
-  const [resources, setResources] = useState<CloudResource[]>([]);
-  const [deleteCount, setDeleteCount] = useState<number>(0);
-  const [saveCount, setSaveCount] = useState<number>(0);
-  const [sweptNames, setSweptNames] = useState<string[]>([]);
-  const [isSwept, setIsSwept] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  // State สำหรับเก็บข้อมูลสถิติและกราฟที่ดึงมาจาก Go Backend
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        router.push('/login');
+      }
+    }
+  }, [router]);
+
+  // States เดิมของคุณ...
+ 
+
   const [dashboardStats, setDashboardStats] = useState({
     totalExpenditure: 0,
     expData: [0, 0, 0, 0, 0, 0, 0],
@@ -31,100 +36,110 @@ export default function DashboardPage() {
     allocData: [0, 0, 0, 0, 0, 0, 0],
   });
 
-  // ดึงข้อมูล Cloud Resources
+  // 1. เพิ่ม State สำหรับ Cost Allocation และ ตัวกรองแผนก
+  const [allocationData, setAllocationData] = useState<any>(null);
+  const [selectedDept, setSelectedDept] = useState('All');
   useEffect(() => {
     let cancelled = false;
-
-    const loadResources = async () => {
+    
+    const fetchDashboardStats = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/resources');
-        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
-
-        const data: CloudResource[] = await res.json();
-        if (cancelled) return;
-
-        setResources(data);
-        setError(null);
+        const response = await fetchWithAuth('http://localhost:8000/api/dashboard-stats');
+        
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        
+        const data = await response.json();
+        
+        if (!cancelled) {
+          setDashboardStats(data);
+        }
       } catch (err) {
-        if (cancelled) return;
-        console.error("Error fetching resources:", err);
-        setError('ตรวจสอบ server backend go port');
-      }
-    };
-
-    loadResources();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSwept]);
-
-  // ดึงข้อมูล Dashboard Stats และกราฟ 7 วันจาก Go Backend
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadDashboardStats = async () => {
-      try {
-        const res = await fetch('http://localhost:8000/api/dashboard-stats');
-        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
-
-        const data = await res.json();
-        if (cancelled) return;
-
-        setDashboardStats(data);
-      } catch (err) {
-        if (cancelled) return;
         console.error("Error fetching dashboard stats:", err);
       }
     };
 
-    loadDashboardStats();
+    fetchDashboardStats();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  // 2. เพิ่ม useEffect สำหรับดึงข้อมูล Cost Allocation (กราฟโดนัท)
+ useEffect(() => {
+    let cancelled = false;
+    const loadAllocationData = async () => {
+      try {
+        const safeDept = encodeURIComponent(selectedDept);
+        const res = await fetchWithAuth(`http://localhost:8000/api/cost-allocation?department=${safeDept}`);
+        
+        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setAllocationData(data);
+      } catch (err) {
+        console.error("Error fetching allocation data:", err);
+      }
+    };
+    loadAllocationData();
+    return () => { cancelled = true; };
+  }, [selectedDept]);
+
+  // 3. แปลงข้อมูล Department ให้เข้ากับ Format ของ PieChart
+  const pieChartData: PieData[] = React.useMemo(() => {
+    if (!allocationData?.allocations || allocationData.allocations.length === 0) return [];
+
+    const grouped: Record<string, number> = {};
+
+    allocationData.allocations.forEach((item: any) => {
+      const keyName = selectedDept === 'All' 
+        ? (item.department || 'Unknown Department') 
+        : (item.projectName || 'Unknown Project'); 
+        
+      const spend = Number(item.currentSpend) || Number(item.spend) || 0; 
+      
+      grouped[keyName] = (grouped[keyName] || 0) + spend;
+    });
+    return Object.keys(grouped).map((name) => ({
+      name: name,
+      value: grouped[name],
+    }));
+  }, [allocationData, selectedDept]);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8f9fa' }}>
       <Sidebar />
-      
+
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', width: `calc(100% - ${drawerWidth}px)` }}>
         <Header />
-        
-        <Box sx={{ p: 4 }}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-              {error}
-            </Alert>
-          )}
 
-          {isSwept && sweptNames.length > 0 && (
-            <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
-              ระบบพบความผิดปกติและ Soft-deleted เครื่องเหล่านี้แล้ว: {sweptNames.join(', ')}
-            </Alert>
-          )}
-          
-          {/* ส่งข้อมูลจริงและกราฟจาก State เข้าไปที่ DashboardKpiCards[cite: 2] */}
-          <DashboardKpiCards 
-            totalExpenditure={dashboardStats.totalExpenditure}
+        <Box sx={{ p: 4 }}>
+          {/* ตัวกรองแผนกด้านบน (เพิ่มเข้ามาใหม่) */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Executive Summary</h1>
+            </Box>
+        
+          </Box>
+
+       <DashboardKpiCards
+            totalExpenditure={allocationData?.summary?.totalSpend || 0}
+            usedAllocation={(allocationData?.summary?.complianceRate || 0).toFixed(1)}
             expData={dashboardStats.expData}
-            totalSavings={saveCount > 0 ? saveCount : dashboardStats.totalSavings}
+            allocData={dashboardStats.allocData}        
+            totalSavings={dashboardStats.totalSavings}
             savData={dashboardStats.savData}
-            usedAllocation={dashboardStats.usedAllocation}
-            allocData={dashboardStats.allocData}
           />
 
           <Grid container spacing={3}>
-            {/* Table Area Component */}
             <Grid size={{ xs: 12, md: 8 }}>
               <ChargesTable />
             </Grid>
 
-            {/* Lifecycle Status Card Component */}
             <Grid size={{ xs: 12, md: 4 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <CostBreakdownCard />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, height: '100%' }}>
+                <CostBreakdownCard
+                  data={pieChartData}
+                  selectedDept={selectedDept}
+                  onDeptChange={(e) => setSelectedDept(e.target.value)}
+                />
               </Box>
             </Grid>
           </Grid>

@@ -22,12 +22,17 @@ interface ChargeItem {
   projected: string;
 }
 
+const COLOR_PRIMARY = '#212b36';
+const COLOR_SECONDARY = '#637381';
+const COLOR_SUCCESS = '#00AB55';
+const COLOR_ERROR = '#FF5630';
+const BG_PROJECTED = '#919eab14';
+
 export default function ChargesTable() {
   const [charges, setCharges] = useState<ChargeItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State สำหรับช่องค้นหา และระบบแบ่งหน้า (Pagination)
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [page, setPage] = useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
@@ -37,18 +42,30 @@ export default function ChargesTable() {
 
     const fetchCharges = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/charges');
-        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:8000/api/charges', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            throw new Error('เซสชันหมดอายุหรือยังไม่ได้เข้าสู่ระบบ (401)');
+          }
+          throw new Error(`HTTP error: ${res.status}`);
+        }
 
         const data: ChargeItem[] = await res.json();
         if (cancelled) return;
 
         setCharges(data || []);
         setError(null);
-      } catch (err) {
+      } catch (err: any) {
         if (cancelled) return;
         console.error("Error fetching charges:", err);
-        setError('ไม่สามารถโหลดข้อมูลค่าใช้จ่ายได้ ตรวจสอบเซิร์ฟเวอร์');
+        setError(err.message || 'ไม่สามารถโหลดข้อมูลค่าใช้จ่ายได้ ตรวจสอบเซิร์ฟเวอร์');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -61,13 +78,11 @@ export default function ChargesTable() {
     };
   }, []);
 
-  // ฟังก์ชันกรองข้อมูลตามช่อง Search (ค้นหาจาก Invoice ID หรือ Provider)
   const filteredCharges = charges.filter((item) =>
     item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.provider.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // ตัดข้อมูลเฉพาะหน้าที่กำลังแสดงอยู่ (10 ตัวต่อหน้า)
   const displayedCharges = filteredCharges.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
@@ -83,21 +98,20 @@ export default function ChargesTable() {
   };
 
   return (
-    <Card elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 3 }}>
-      <CardContent>
+    <Card elevation={0} sx={{ border: '1px solid #919eab3d', borderRadius: 4, boxShadow: '0 12px 24px -4px rgb(145 158 171 / 12%)', bgcolor: '#ffffff' }}>
+      <CardContent sx={{ p: '24px !important' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', color: COLOR_PRIMARY }}>
             Recent charges
           </Typography>
 
-          {/* ช่องค้นหาข้อมูล */}
           <TextField
             size="small"
             placeholder="Search ID or Provider..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              setPage(0); // Reset กลับมาหน้าแรกเมื่อพิมพ์ค้นหา
+              setPage(0);
             }}
             slotProps={{
               input: {
@@ -122,12 +136,12 @@ export default function ChargesTable() {
           <Table sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ color: 'text.secondary', fontWeight: 'medium' }}>Invoice ID</TableCell>
-                <TableCell sx={{ color: 'text.secondary', fontWeight: 'medium' }}>Service provider</TableCell>
-                <TableCell sx={{ color: 'text.secondary', fontWeight: 'medium' }}>Usage</TableCell>
-                <TableCell sx={{ color: 'text.secondary', fontWeight: 'medium' }}>Interval</TableCell>
-                <TableCell sx={{ color: 'text.secondary', fontWeight: 'medium' }}>Amount</TableCell>
-                <TableCell sx={{ color: 'text.secondary', fontWeight: 'medium' }}>Projected cost</TableCell>
+                <TableCell sx={{ color: COLOR_PRIMARY, fontWeight: 'bold', fontSize: '0.85rem' }}>Invoice ID</TableCell>
+                <TableCell sx={{ color: COLOR_PRIMARY, fontWeight: 'bold', fontSize: '0.85rem' }}>Service provider</TableCell>
+                <TableCell sx={{ color: COLOR_PRIMARY, fontWeight: 'bold', fontSize: '0.85rem' }}>Usage</TableCell>
+                <TableCell sx={{ color: COLOR_PRIMARY, fontWeight: 'bold', fontSize: '0.85rem' }}>Interval</TableCell>
+                <TableCell sx={{ color: COLOR_PRIMARY, fontWeight: 'bold', fontSize: '0.85rem' }}>Amount</TableCell>
+                <TableCell sx={{ color: COLOR_PRIMARY, fontWeight: 'bold', fontSize: '0.85rem' }}>Projected cost</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -135,7 +149,7 @@ export default function ChargesTable() {
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={30} />
-                    <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                    <Typography variant="body2" sx={{ mt: 1, color: COLOR_SECONDARY }}>
                       กำลังโหลดข้อมูล...
                     </Typography>
                   </TableCell>
@@ -143,31 +157,29 @@ export default function ChargesTable() {
               ) : displayedCharges.length > 0 ? (
                 displayedCharges.map((row, index) => (
                   <TableRow key={index} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                    <TableCell>
-                      <Box sx={{ display: 'inline-block', py: 0.5, borderRadius: 1 }}>
-                        {row.id}
-                      </Box>
+                    <TableCell sx={{ color: COLOR_PRIMARY, fontWeight: 500 }}>
+                      {row.id}
                     </TableCell>
-
                     <TableCell>
+                      
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <img src={row.icon} alt={row.provider} style={{ width: 20, height: 20, objectFit: 'contain' }} />
-                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>{row.provider}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: COLOR_PRIMARY }}>{row.provider}</Typography>
                       </Box>
                     </TableCell>
 
-                    <TableCell>{row.usage}</TableCell>
-                    <TableCell>{row.interval}</TableCell>
+                    <TableCell sx={{ color: COLOR_SECONDARY, fontSize: '0.85rem' }}>{row.usage}</TableCell>
+                    <TableCell sx={{ color: COLOR_SECONDARY, fontSize: '0.85rem' }}>{row.interval}</TableCell>
 
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{row.amount}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: COLOR_PRIMARY }}>{row.amount}</Typography>
                         <Box sx={{
                           display: 'flex',
                           alignItems: 'center',
                           fontSize: '0.75rem',
                           fontWeight: 'bold',
-                         color: row.isUp ? '#2e7d32' : '#d32f2f'
+                          color: row.isUp ? COLOR_SUCCESS : COLOR_ERROR
                         }}>
                           {row.isUp ? <ArrowDropUpIcon fontSize="small" /> : <ArrowDropDownIcon fontSize="small" />}
                           {row.percent}%
@@ -175,12 +187,27 @@ export default function ChargesTable() {
                       </Box>
                     </TableCell>
 
-                    <TableCell sx={{ color: 'text.secondary' }}>{row.projected}</TableCell>
+                    <TableCell>
+                      <Box
+                        sx={{
+                          display: 'inline-block',
+                          bgcolor: BG_PROJECTED,
+                          color: COLOR_PRIMARY,
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1.5
+                        }}
+                      >
+                        {row.projected}
+                      </Box>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: COLOR_SECONDARY }}>
                     ไม่พบข้อมูลประวัติการเรียกเก็บเงิน
                   </TableCell>
                 </TableRow>
@@ -189,7 +216,6 @@ export default function ChargesTable() {
           </Table>
         </TableContainer>
 
-        {/* แถบแบ่งหน้า (Pagination) */}
         <TablePagination
           component="div"
           count={filteredCharges.length}

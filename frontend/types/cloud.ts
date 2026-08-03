@@ -11,9 +11,9 @@ export interface CloudResource {
 
 export interface SweepResponse {
   ID: string;
-  Items_swept: number;
+  items_swept: number;
   saved_cost_daily: number;
-  Swept_details: string[];
+  swept_details: string[];
 }
 
 export interface ChargeItem {
@@ -26,4 +26,39 @@ export interface ChargeItem {
   percent: number;
   isUp: boolean;
   projected: string;
+}
+
+export interface AllocationItem {
+  id: string;
+  department: string;
+  projectName: string;
+  owner: string;
+  provider: string;
+  allocationModel: string;
+  spend: number;
+  momChange: number;
+  isTagged: boolean;
+}
+
+export interface AllocationDepartmentSummary {
+  department: string;
+  projects: number;
+  spend: number;
+  tagged: number;
+}
+
+export interface AllocationSummary {
+  totalSpend: number;
+  complianceRate: number;
+  taggedCount: number;
+  untaggedCount: number;
+  averageMomChange: number;
+  departments: AllocationDepartmentSummary[];
+}
+
+export interface AllocationResponse {
+  status: string;
+  generatedAt: string;
+  summary: AllocationSummary;
+  allocations: AllocationItem[];
 }
