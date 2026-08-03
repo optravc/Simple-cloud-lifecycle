@@ -1,7 +1,9 @@
 package handlers
 
 import (
-	"automated-lifecycle/backend/internal/services"
+	"automated-lifecycle/backend/internal/services/finance"
+	"automated-lifecycle/backend/internal/services/ops"
+	"automated-lifecycle/backend/internal/services/cloud"
 	"database/sql" // อย่าลืม import database/sql
 	"encoding/json"
 	"net/http"
@@ -10,7 +12,7 @@ import (
 func DashboardStatsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// เรียกใช้ Service ที่เราเขียนไว้ก่อนหน้านี้
-		stats := services.GetDashboardStats(db)
+		stats := finance.GetDashboardStats(db)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -29,7 +31,7 @@ func GetChargesHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		charges := services.GetRecentCharges(db)
+		charges := finance.GetRecentCharges(db)
 		w.Header().Set("Content-Type", "application/json")
 		
 		// ส่งข้อมูลกลับไปให้ Frontend
@@ -38,63 +40,46 @@ func GetChargesHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // 1. Resources ทั้งหมด
-func GetAllResourcesHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "not allowed", http.StatusMethodNotAllowed)
-		return
+func GetAllResourcesHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		
+		// ต้องส่ง db ไปให้ service ด้วย เพื่อเอาไป Query หาอีเมล
+		resources := ops.GetAllResources(db)
+		
+		w.Header().Set("Access-Control-Allow-Origin", "*") 
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resources)
 	}
-	resource := services.GetAllResources()
-	
-	w.Header().Set("Access-Control-Allow-Origin", "*") 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resource)
-}
-
-// 2.  Sweeper ลบทรัพยากรที่ไม่ได้ใช้งาน
-func RunSweeperHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	DeleteCount, SaveCount, SweptName := services.ScanAndSweep()
-
-	Response := map[string]interface{}{
-		"message":          "Sandbox scan completed",
-		"items_swept":      DeleteCount,
-		"saved_cost_daily": SaveCount,
-		"swept_details":    SweptName,
-	}
-	
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Response)
 }
 
 // 3. ดึงรายงานภาพรวม (ROI & NPV) สำหรับหน้า Dashboard
-func GetReportsHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "not allowed", http.StatusMethodNotAllowed)
-		return
+func GetReportsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// ดึงข้อมูล Resource ทั้งหมดโดยส่ง db เข้าไป
+		resources := ops.GetAllResources(db)
+
+		roiData := finance.CalROI(resources)
+		npvData := finance.CalNPVPerInstance(resources, 0.05)
+
+		Response := map[string]interface{}{
+			"status":       "success",
+			"roi_summary":  roiData,
+			"npv_analysis": npvData,
+		}
+
+		w.Header().Set("Access-Control-Allow-Origin", "*") 
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(Response)
 	}
-
-	// ดึงข้อมูล Resource ทั้งหมด
-	resources := services.GetAllResources()
-
-	// คำนวณ ROI และ NPV (สมมติอัตราคิดลดที่ 5% หรือ 0.05)
-	roiData := services.CalROI(resources)
-	npvData := services.CalNPVPerInstance(resources, 0.05)
-
-	// จัดโครงสร้าง Response
-	Response := map[string]interface{}{
-		"status":       "success",
-		"roi_summary":  roiData,
-		"npv_analysis": npvData,
-	}
-
-	w.Header().Set("Access-Control-Allow-Origin", "*") 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Response)
 }
 
 func CreateChargeWithImageHandler(db *sql.DB) http.HandlerFunc {
@@ -115,7 +100,7 @@ func CreateChargeWithImageHandler(db *sql.DB) http.HandlerFunc {
 		defer file.Close()
 
 	
-		imageUrl, err := services.UploadImageToS3(file, header.Filename)
+		imageUrl, err := cloud.UploadImageToS3(file, header.Filename)
 		if err != nil {
 			http.Error(w, "Failed to upload to S3", http.StatusInternalServerError)
 			return

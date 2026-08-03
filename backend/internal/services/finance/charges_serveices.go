@@ -1,4 +1,4 @@
-package services
+package finance
 
 import (
 	"automated-lifecycle/backend/internal/models" 

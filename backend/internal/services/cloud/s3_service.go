@@ -1,4 +1,4 @@
-package services
+package cloud
 
 import (
 	"context"
@@ -25,11 +25,9 @@ func UploadImageToS3(file multipart.File, filename string) (string, error) {
 	client := s3.NewFromConfig(cfg)
 	uploader := manager.NewUploader(client)
 
-	// เปลี่ยนตรงนี้เป็นชื่อ Bucket ที่คุณสร้างไว้ใน AWS
 	bucketName := "simeple-cloud-lifecylce-demo-storage" 
 	folderPath := "providers/icons/" + filename
 
-	// 3. สั่งอัปโหลดไฟล์
 	result, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(folderPath),

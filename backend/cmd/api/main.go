@@ -2,6 +2,8 @@ package main
 
 import (
 	"automated-lifecycle/backend/internal/routes"
+	"automated-lifecycle/backend/internal/services/cloud"
+	"automated-lifecycle/backend/internal/services/ops"
 	"database/sql" // 1. นำเข้า package sql สำหรับจัดการฐานข้อมูล
 	"fmt"
 	"log"
@@ -27,6 +29,8 @@ func main() {
 	// อย่าลืมไปเพิ่ม DB_URL ไว้ในไฟล์ .env ของคุณนะครับ
 	dbConnStr := os.Getenv("DB_URL")
 	db, err := sql.Open("postgres", dbConnStr)
+	cloud.StartCostSyncCron(db)
+	ops.StartSweeperCron(db)
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
 	}

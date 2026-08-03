@@ -1,4 +1,4 @@
-package services
+package cloud
 
 import "automated-lifecycle/backend/internal/models"
 

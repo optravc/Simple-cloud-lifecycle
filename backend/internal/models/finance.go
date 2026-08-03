@@ -45,10 +45,8 @@ type ChargeItem struct {
 type DashboardStats struct {
 	TotalExpenditure float64   `json:"totalExpenditure"` // ยอดรวมเดือนปัจจุบัน (MTD)
 	ExpData          []float64 `json:"expData"`          // กราฟ 7 วัน (Expenditure)
-
 	TotalSavings     float64   `json:"totalSavings"`     // ยอดรวมเงินที่ประหยัดได้
 	SavData          []float64 `json:"savData"`          // กราฟ 7 วัน (Savings)
-
 	UsedAllocation   float64   `json:"usedAllocation"`   // เปอร์เซ็นต์การใช้งานล่าสุด
 	AllocData        []float64 `json:"allocData"`        // กราฟ 7 วัน (Allocation)
 }
