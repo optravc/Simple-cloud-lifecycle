@@ -82,9 +82,9 @@ SECRETS=$(aws secretsmanager get-secret-value \
 echo "$SECRETS" | jq -r 'to_entries[] | "\(.key)=\(.value)"' > /opt/app/.env
 
 # ── Clone repository & deploy ─────────────────────────────────
-cd /opt/app
-git clone https://github.com/optravc/simple-cloud-lifecycle.git repo
-cd repo
+mkdir -p /opt/app/repo
+git clone https://github.com/optravc/Simple-cloud-lifecycle.git /opt/app/repo
+cd /opt/app/repo
 
 # Copy .env to backend
 cp /opt/app/.env backend/.env

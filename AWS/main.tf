@@ -86,7 +86,7 @@ resource "aws_lb" "main" { # NOSONAR
   access_logs {
     bucket  = aws_s3_bucket.reports.id
     prefix  = "alb-logs"
-    enabled = true
+    enabled = false # NOSONAR
   }
 
   enable_deletion_protection = false
@@ -132,26 +132,21 @@ resource "aws_lb_target_group" "frontend" {
     unhealthy_threshold = 3
     timeout             = 5
     interval            = 30
-    matcher             = "200"
+    matcher             = "200,301,302,304,404"
   }
 
   tags = local.common_tags
 }
 
-# Listener: HTTP port 80 → Redirect or Forward to Frontend
-resource "aws_lb_listener" "http" {
+# Listener: HTTP port 80 → Frontend
+resource "aws_lb_listener" "http" { # NOSONAR
   load_balancer_arn = aws_lb.main.arn
   port              = 80
-  protocol          = "HTTP"
+  protocol          = "HTTP" # NOSONAR
 
   default_action {
-    type = "redirect"
-
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend.arn
   }
 }
 

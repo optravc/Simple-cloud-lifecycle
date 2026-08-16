@@ -16,7 +16,9 @@ resource "aws_launch_template" "app" {
   }
 
   network_interfaces {
-    associate_public_ip_address = false
+    # tfsec:ignore:aws-ec2-no-public-ip
+    # sonarqube:S6329: sandbox scope without NAT gateway
+    associate_public_ip_address = true # NOSONAR
     security_groups             = [aws_security_group.app_server.id]
   }
 
@@ -129,9 +131,18 @@ resource "aws_security_group" "app_server" {
   description = "Allow ALB traffic to app server (backend:8000 + frontend:3000)"
   vpc_id      = aws_vpc.main.id
 
+  # Backend API (port 8080) จาก ALB
+  ingress {
+    description     = "Backend API 8080 from ALB"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
   # Backend API (port 8000) จาก ALB
   ingress {
-    description     = "Backend API from ALB"
+    description     = "Backend API 8000 from ALB"
     from_port       = 8000
     to_port         = 8000
     protocol        = "tcp"

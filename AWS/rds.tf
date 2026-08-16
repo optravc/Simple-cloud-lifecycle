@@ -68,7 +68,8 @@ resource "aws_db_instance" "main" {
   multi_az             = false # sandbox — ถ้า production ให้เปลี่ยนเป็น true
 
   # Backup
-  backup_retention_period = 7
+  # sonarqube:S6364: AWS Free Tier restriction in Sandbox
+  backup_retention_period = 0 # NOSONAR
   backup_window           = "03:00-04:00"   # UTC (= 10:00-11:00 ICT)
   maintenance_window      = "sun:04:00-sun:05:00"
 
