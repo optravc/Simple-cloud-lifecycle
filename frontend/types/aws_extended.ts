@@ -12,7 +12,7 @@ export interface CostAnomalyItem {
 export interface AnomalySummary {
   total_anomalies: number;
   total_impact_usd: number;
-  status: 'ACTIVE' | 'OK' | 'UNAVAILABLE' | string;
+  status: 'ACTIVE' | 'OK' | 'UNAVAILABLE' | (string & {});
   status_message: string;
   anomalies: CostAnomalyItem[];
 }
@@ -30,7 +30,7 @@ export interface SavingsPlanRecommendationItem {
 export interface SavingsPlansSummary {
   total_recommendations: number;
   total_monthly_savings_usd: number;
-  status: 'ACTIVE' | 'UNAVAILABLE' | string;
+  status: 'ACTIVE' | 'UNAVAILABLE' | (string & {});
   status_message: string;
   recommendations: SavingsPlanRecommendationItem[];
 }
@@ -54,7 +54,7 @@ export interface UnattachedResourceSummary {
   total_unattached_volumes: number;
   total_unused_elastic_ips: number;
   total_monthly_waste_usd: number;
-  status: 'ACTIVE' | 'OK' | 'UNAVAILABLE' | string;
+  status: 'ACTIVE' | 'OK' | 'UNAVAILABLE' | (string & {});
   status_message: string;
   volumes: UnattachedVolumeItem[];
   elastic_ips: UnusedElasticIPItem[];

@@ -1,10 +1,10 @@
 import { Box, Typography, Button } from '@mui/material';
 
 interface ManageHeaderToolbarProps {
-  userRole: string;
-  userDept?: string;
-  onOpenCreateTeam: () => void;
-  onOpenLaunchServer: () => void;
+  readonly userRole: string;
+  readonly userDept?: string;
+  readonly onOpenCreateTeam: () => void;
+  readonly onOpenLaunchServer: () => void;
 }
 
 export default function ManageHeaderToolbar({

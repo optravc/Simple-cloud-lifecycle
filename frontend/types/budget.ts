@@ -47,15 +47,15 @@ export interface BudgetAllocationChartProps {
 }
 
 export interface CostCentersGovernanceTableProps {
-  departments: DepartmentBudget[];
-  totalCount: number;
-  filteredCount: number;
-  page: number;
-  rowsPerPage: number;
-  userRole: UserRole;
-  onPageChange: (_: unknown, newPage: number) => void;
-  onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onOpenAdjustModal: (deptId?: number) => void;
+  readonly departments: DepartmentBudget[];
+  readonly totalCount: number;
+  readonly filteredCount: number;
+  readonly page: number;
+  readonly rowsPerPage: number;
+  readonly userRole: UserRole;
+  readonly onPageChange: (_: unknown, newPage: number) => void;
+  readonly onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  readonly onOpenAdjustModal: (deptId?: number) => void;
 }
 
 export interface StatCardProps {
