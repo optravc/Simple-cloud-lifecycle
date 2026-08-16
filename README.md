@@ -17,23 +17,23 @@ Centralized Cloud Financial Management (FinOps) dashboard for monitoring, analyz
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
 | Feature | Description |
 |---------|-------------|
-| 📊 **Dashboard Stats** | MTD spend, budget usage %, active resources, and cost anomaly alerts |
-| 💰 **Cost Allocation** | Spend breakdown by project, team, and department |
-| 🔍 **Resource Sweeper** | Scan and terminate idle EC2 instances with email & Slack alerts |
-| 📈 **Reports & Analytics** | Cost trend charts, ROI/NPV metrics, and export features |
-| 🛡️ **Budget Governance** | Set budget limits per department and get alert notifications |
-| 🖥️ **Resource Control** | Start, stop, and manage EC2 instances directly from the dashboard |
-| 📧 **Invoice Management** | Upload billing invoices/receipts directly to Amazon S3 |
-| ⚡ **Performance Metrics** | View CPU, Memory, and Disk usage via CloudWatch integration |
-| 🔐 **Role-Based Auth** | User authentication and role permissions using Amazon Cognito (JWT) |
+|  **Dashboard Stats** | MTD spend, budget usage %, active resources, and cost anomaly alerts |
+|  **Cost Allocation** | Spend breakdown by project, team, and department |
+|  **Resource Sweeper** | Scan and terminate idle EC2 instances with email & Slack alerts |
+|  **Reports & Analytics** | Cost trend charts, ROI/NPV metrics, and export features |
+|  **Budget Governance** | Set budget limits per department and get alert notifications |
+|  **Resource Control** | Start, stop, and manage EC2 instances directly from the dashboard |
+|  **Invoice Management** | Upload billing invoices/receipts directly to Amazon S3 |
+|  **Performance Metrics** | View CPU, Memory, and Disk usage via CloudWatch integration |
+|  **Role-Based Auth** | User authentication and role permissions using Amazon Cognito (JWT) |
 
 ---
 
-## 🏗️ Cloud Architecture
+##  Cloud Architecture
 
 ![Cloud Architecture Diagram](docs/images/architecture_diagram.png)
 
@@ -60,7 +60,7 @@ Application Load Balancer  (Port 80/443)
 
 ---
 
-## 🗄️ Database Schema (ER Diagram)
+##  Database Schema (ER Diagram)
 
 Entity Relationship Diagram for PostgreSQL tracking teams, budgets, projects, cloud invoices, resource allocations, and sweeper logs.
 
@@ -68,8 +68,7 @@ Entity Relationship Diagram for PostgreSQL tracking teams, budgets, projects, cl
 
 ---
 
-## 🛠️ Tech Stack
-
+##  Tech Stack
 - **Frontend:** Next.js 15, TypeScript, Tailwind CSS, Material UI, Recharts
 - **Backend:** Go 1.24 (Golang), REST API, AWS SDK v2
 - **Database:** PostgreSQL 16 (AWS RDS)
@@ -78,7 +77,7 @@ Entity Relationship Diagram for PostgreSQL tracking teams, budgets, projects, cl
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 simple-cloud-lifecycle/
@@ -105,7 +104,7 @@ simple-cloud-lifecycle/
 
 ---
 
-##  Estimated Infrastructure Cost (Infracost)
+## Estimated Infrastructure Cost (Infracost)
 
 Estimated monthly cost on **AWS (ap-southeast-1)** provisioned via Terraform:
 
@@ -123,7 +122,7 @@ Estimated monthly cost on **AWS (ap-southeast-1)** provisioned via Terraform:
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
