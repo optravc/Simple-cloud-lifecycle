@@ -23,8 +23,9 @@ resource "aws_ses_configuration_set" "main" {
 # ── SNS Topic สำหรับ SES Bounce/Complaint notifications ──────
 
 resource "aws_sns_topic" "ses_notifications" {
-  name = "${local.name_prefix}-ses-notifications"
-  tags = local.common_tags
+  name              = "${local.name_prefix}-ses-notifications"
+  kms_master_key_id = "alias/aws/sns"
+  tags              = local.common_tags
 }
 
 resource "aws_ses_identity_notification_topic" "bounce" {

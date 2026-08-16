@@ -15,9 +15,8 @@ resource "aws_launch_template" "app" {
     arn = aws_iam_instance_profile.app_server.arn
   }
 
-  # Network
   network_interfaces {
-    associate_public_ip_address = true
+    associate_public_ip_address = false
     security_groups             = [aws_security_group.app_server.id]
   }
 

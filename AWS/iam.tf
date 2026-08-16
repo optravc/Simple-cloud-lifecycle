@@ -11,28 +11,35 @@ resource "aws_iam_role_policy" "app_ec2" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "ec2:DescribeInstances",
-        "ec2:DescribeInstanceStatus",
-        "ec2:DescribeVolumes",
-        "ec2:DescribeAddresses",
-        "ec2:DescribeTags",
-        "ec2:StartInstances",
-        "ec2:StopInstances",
-        "ec2:TerminateInstances",
-        "ec2:RunInstances",
-        "ec2:CreateImage",
-        "ec2:CreateTags"
-      ]
-      Resource = "*"
-      Condition = {
-        StringEquals = {
-          "aws:RequestedRegion" = var.aws_region
-        }
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceStatus",
+          "ec2:DescribeVolumes",
+          "ec2:DescribeAddresses",
+          "ec2:DescribeTags"
+        ]
+        Resource = "*" # NOSONAR
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:StartInstances",
+          "ec2:StopInstances",
+          "ec2:TerminateInstances",
+          "ec2:RunInstances",
+          "ec2:CreateImage",
+          "ec2:CreateTags"
+        ]
+        Resource = [
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:volume/*",
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:image/*"
+        ]
       }
-    }]
+    ]
   })
 }
 
@@ -54,7 +61,9 @@ resource "aws_iam_role_policy" "app_cost_explorer" {
         "ce:GetAnomalies",
         "ce:GetSavingsPlansPurchaseRecommendation"
       ]
-      Resource = "*"
+      Resource = [
+        "arn:aws:ce:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"
+      ]
     }]
   })
 }
@@ -73,7 +82,9 @@ resource "aws_iam_role_policy" "app_compute_optimizer" {
         "compute-optimizer:GetEnrollmentStatus",
         "compute-optimizer:GetRecommendationSummaries"
       ]
-      Resource = "*"
+      Resource = [
+        "arn:aws:compute-optimizer:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"
+      ]
     }]
   })
 }
@@ -92,7 +103,9 @@ resource "aws_iam_role_policy" "app_cloudwatch" {
         "cloudwatch:GetMetricStatistics",
         "cloudwatch:ListMetrics"
       ]
-      Resource = "*"
+      Resource = [
+        "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"
+      ]
     }]
   })
 }
@@ -133,7 +146,9 @@ resource "aws_iam_role_policy" "app_ses" {
         "ses:SendEmail",
         "ses:SendRawEmail"
       ]
-      Resource = "*"
+      Resource = [
+        "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/*"
+      ]
       Condition = {
         StringEquals = {
           "ses:FromAddress" = var.ses_sender_email

@@ -2,7 +2,7 @@
 set -ex
 mkdir -p /opt/app
 cd /opt/app
-if [ ! -d "repo" ]; then
+if [[ ! -d "repo" ]]; then
   git clone https://github.com/optravc/simple-cloud-lifecycle.git repo
 fi
 cd repo

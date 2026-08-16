@@ -11,6 +11,41 @@ resource "aws_s3_bucket" "reports" {
   })
 }
 
+# ── Enable S3 Bucket Access Logging
+
+resource "aws_s3_bucket_logging" "reports" {
+  bucket        = aws_s3_bucket.reports.id
+  target_bucket = aws_s3_bucket.reports.id
+  target_prefix = "access-logs/"
+}
+
+# ── Enforce HTTPS-Only Access Policy
+
+resource "aws_s3_bucket_policy" "enforce_tls" {
+  bucket = aws_s3_bucket.reports.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "EnforceTLSRequestsOnly"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.reports.arn,
+          "${aws_s3_bucket.reports.arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
+  })
+}
+
 # ── Block all public access ───────────────────────────────────
 
 resource "aws_s3_bucket_public_access_block" "reports" {

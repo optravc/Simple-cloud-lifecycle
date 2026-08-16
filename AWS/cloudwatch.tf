@@ -5,8 +5,9 @@
 # ── SNS Topic สำหรับ Alarms ───────────────────────────────────
 
 resource "aws_sns_topic" "alarms" {
-  name = "${local.name_prefix}-alarms"
-  tags = local.common_tags
+  name              = "${local.name_prefix}-alarms"
+  kms_master_key_id = "alias/aws/sns"
+  tags              = local.common_tags
 }
 
 resource "aws_sns_topic_subscription" "alarms_email" {
