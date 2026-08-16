@@ -1,17 +1,16 @@
 package handlers
 
 import (
-	"automated-lifecycle/backend/internal/services/finance"
 	"automated-lifecycle/backend/internal/services/cloud"
+	"automated-lifecycle/backend/internal/services/finance"
 	"database/sql"
-	"encoding/json"
 	"net/http"
 )
 
+// GetCostAllocationHandler retrieves cost allocation data
 func GetCostAllocationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "not allowed", http.StatusMethodNotAllowed)
+		if !checkMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -20,53 +19,52 @@ func GetCostAllocationHandler(db *sql.DB) http.HandlerFunc {
 
 		response, err := finance.GetCostAllocationData(r.Context(), db, selectedDept, tagFilter)
 		if err != nil {
-			http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
+			writeHTTPError(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		writeJSONResponse(w, http.StatusOK, response)
 	}
 }
 
+// TriggerCostSyncHandler triggers manual AWS Cost Explorer data sync
 func TriggerCostSyncHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "not allowed", http.StatusMethodNotAllowed)
+		if !checkMethod(w, r, http.MethodPost) {
 			return
 		}
 
-		err := cloud.SyncAWSCostData(db)
+		err := cloud.SyncAWSCostData(r.Context(), db)
 		if err != nil {
-			http.Error(w, "Failed to sync AWS Cost: "+err.Error(), http.StatusInternalServerError)
+			writeHTTPError(w, "Failed to sync AWS Cost: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"message": "AWS Cost sync completed successfully"}`))
+		writeJSONResponse(w, http.StatusOK, map[string]string{
+			"message": "AWS Cost sync completed successfully",
+		})
 	}
 }
 
+// GetProjectBreakdownHandler fetches service breakdown data for a specific project ID
 func GetProjectBreakdownHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "not allowed", http.StatusMethodNotAllowed)
+		if !checkMethod(w, r, http.MethodGet) {
 			return
 		}
 
 		projectID := r.URL.Query().Get("id")
 		if projectID == "" {
-			http.Error(w, "Missing project id parameter", http.StatusBadRequest)
+			writeHTTPError(w, "Missing project id parameter", http.StatusBadRequest)
 			return
 		}
 
 		breakdown, err := finance.GetProjectServiceBreakdown(r.Context(), db, projectID)
 		if err != nil {
-			http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
+			writeHTTPError(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(breakdown)
+		writeJSONResponse(w, http.StatusOK, breakdown)
 	}
 }

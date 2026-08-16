@@ -1,53 +1,73 @@
 package main
 
 import (
+	"automated-lifecycle/backend/internal/middleware"
 	"automated-lifecycle/backend/internal/routes"
 	"automated-lifecycle/backend/internal/services/cloud"
+	"automated-lifecycle/backend/internal/services/finance"
 	"automated-lifecycle/backend/internal/services/ops"
-	"database/sql" // 1. นำเข้า package sql สำหรับจัดการฐานข้อมูล
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq" // 2. นำเข้า PostgreSQL driver แบบ blank import
+	_ "github.com/lib/pq"
 )
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Print("not found .envfile")
+		log.Println("[Warning] .env file not found, relying on system environment variables")
 	} else {
-		fmt.Print("found.envfile\n")
+		log.Println("[Info] Loaded configurations from .env file")
 	}
 
 	region := os.Getenv("AWS_REGION")
-	fmt.Printf("Cloud region: %s\n", region)
+	log.Printf("[Info] Cloud region: %s\n", region)
 
-	// 3. ดึง Connection String จาก .env มาเชื่อมต่อกับ AWS RDS PostgreSQL
-	// อย่าลืมไปเพิ่ม DB_URL ไว้ในไฟล์ .env ของคุณนะครับ
 	dbConnStr := os.Getenv("DB_URL")
+	if dbConnStr == "" {
+		log.Fatal("[Fatal] DB_URL environment variable is required but not set")
+	}
+
 	db, err := sql.Open("postgres", dbConnStr)
-	cloud.StartCostSyncCron(db)
-	ops.StartSweeperCron(db)
 	if err != nil {
-		log.Fatalf("Error opening database: %v", err)
+		log.Fatalf("[Fatal] Error opening database connection: %v", err)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Database connection failed: %v", err)
+		log.Fatalf("[Fatal] Database connectivity check failed: %v", err)
 	}
-	fmt.Println("Database connected successfully!")
+	log.Println("[Info] Connected to PostgreSQL database successfully")
 
-	
+	// 1. Initialize AWS Cognito JWKS Cache
+	if err := middleware.InitJWKS(); err != nil {
+		log.Fatalf("[Fatal] Failed to initialize AWS Cognito JWKS: %v", err)
+	}
+	log.Println("[Info] AWS Cognito JWKS initialized successfully")
+
+	// 2. Seed default trend data if they do not exist
+	finance.SeedTrendData(db)
+
+	// 3. Start background schedulers/cron jobs
+	cloud.StartCostSyncCron(db)
+	ops.StartSweeperCron(db)
+	ops.StartLeaseExpiryCron(db)
+
+	// 4. Register API routes
 	mux := routes.Routes(db)
-	port := ":8000"
 
-	fmt.Printf("backend running on http://localhost%s\n", port)
+	// 5. Determine HTTP server port from environment variable with fallback
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000"
+	}
+	formattedPort := ":" + port
 
-	if err := http.ListenAndServe(port, mux); err != nil {
-		panic(err)
+	log.Printf("[System] Backend HTTP Server running on http://localhost%s\n", formattedPort)
+	if err := http.ListenAndServe(formattedPort, mux); err != nil {
+		log.Fatalf("[Fatal] Server terminated unexpectedly: %v", err)
 	}
 }

@@ -20,7 +20,7 @@ type NPVResult struct {
 	Reason      string `json:"Reason"`
 }
 
-func CalNPVPerInstance(resource []models.CloudR, discountRate float64) []NPVResult {
+func CalNPVPerInstance(resource []models.CloudResource, discountRate float64) []NPVResult {
 	results := make([]NPVResult, 0, len(resource))
 	if discountRate < 0 {
 		discountRate = 0
@@ -32,10 +32,10 @@ func CalNPVPerInstance(resource []models.CloudR, discountRate float64) []NPVResu
 		pvIfKept := 0.0
 		for day := 1; day <= r.DayIdle; day++ {
 			factor := math.Pow(1+dailyDiscountRate, float64(day))
-			pvIfKept += r.Costperday / factor
+			pvIfKept += r.CostPerDay / factor
 		}
 
-		pvIfSwept := r.Costperday
+		pvIfSwept := r.CostPerDay
 		npv := pvIfKept - pvIfSwept
 
 		reason := "Keep resource"
@@ -49,7 +49,7 @@ func CalNPVPerInstance(resource []models.CloudR, discountRate float64) []NPVResu
 			ResourceID:   r.ID,
 			ResourceName: r.Name,
 			DayIdle:      r.DayIdle,
-			CostPerDay:   r.Costperday,
+			CostPerDay:   r.CostPerDay,
 			PVifKept:     pvIfKept,
 			PVifSwept:    pvIfSwept,
 			NPV:          npv,

@@ -20,7 +20,7 @@ func GetRecentCharges(db *sql.DB) []models.ChargeItem {
 	}
 	defer rows.Close()
 
-	var charges []models.ChargeItem
+	charges := []models.ChargeItem{}
 
 	for rows.Next() {
 		var item models.ChargeItem

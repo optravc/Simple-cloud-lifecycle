@@ -1,10 +1,14 @@
 package noti
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -12,25 +16,39 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ses/types"
 )
 
+type EmailNotificationInput struct {
+	OwnerEmail   string
+	OwnerTeam    string
+	InstanceID   string
+	InstanceName string
+	Deadline     string
+	Region       string
+	Environment  string
+	CostPerDay   float64
+	IdleDays     int
+}
+
+type LeaseNotificationInput struct {
+	OwnerEmail    string
+	OwnerTeam     string
+	InstanceID    string
+	InstanceName  string
+	Deadline      string
+	Region        string
+	Environment   string
+	CostPerDay    float64
+	IsGracePeriod bool
+}
+
 // SendSweepNotificationEmail ส่งอีเมลแจ้งเตือนผ่าน AWS SES (รองรับข้อมูล FinOps และ Resource Details ครบถ้วน)
-func SendSweepNotificationEmail(
-	ownerEmail string,
-	ownerTeam string,
-	instanceID string,
-	instanceName string,
-	deadline string,
-	region string,
-	environment string,
-	costPerDay float64,
-	idleDays int,
-) {
+func SendSweepNotificationEmail(input EmailNotificationInput) {
 	ctx := context.TODO()
 
-	// ถ้าไม่ได้ส่ง region มา ให้ดึงจาก Env หรือใช้ค่าเริ่มต้น
+	region := input.Region
 	if region == "" {
 		region = os.Getenv("AWS_REGION")
 		if region == "" {
-			region = "ap-southeast-7"
+			region = "ap-southeast-1"
 		}
 	}
 
@@ -53,14 +71,11 @@ func SendSweepNotificationEmail(
 		baseURL = "http://localhost:8000"
 	}
 
-	// สร้างลิงก์สำหรับกด Confirm หรือ Cancel จากอีเมล
-	confirmLink := fmt.Sprintf("%s/api/resolve?id=%s&action=confirm", baseURL, instanceID)
-	cancelLink := fmt.Sprintf("%s/api/resolve?id=%s&action=cancel", baseURL, instanceID)
+	confirmLink := fmt.Sprintf("%s/api/resolve?id=%s&action=confirm", baseURL, input.InstanceID)
+	cancelLink := fmt.Sprintf("%s/api/resolve?id=%s&action=cancel", baseURL, input.InstanceID)
 
-	// คำนวณค่าใช้จ่ายรายเดือนคร่าวๆ
-	monthlyCost := costPerDay * 30.0
-
-	subject := fmt.Sprintf("[Cloud Lifecycle] Action Required: Idle Resource %s Scheduled for Deletion", instanceName)
+	monthlyCost := input.CostPerDay * 30.0
+	subject := fmt.Sprintf("[Cloud Lifecycle] Action Required: Idle Resource %s Scheduled for Deletion", input.InstanceName)
 	
 	body := fmt.Sprintf(`<!DOCTYPE html>
 	<html>
@@ -114,12 +129,12 @@ func SendSweepNotificationEmail(
 		</div>
 	</body>
 	</html>`,
-		ownerTeam, instanceName, instanceID, region, environment, idleDays, costPerDay, monthlyCost, deadline, confirmLink, cancelLink,
+		input.OwnerTeam, input.InstanceName, input.InstanceID, region, input.Environment, input.IdleDays, input.CostPerDay, monthlyCost, input.Deadline, confirmLink, cancelLink,
 	)
 
-	input := &ses.SendEmailInput{
+	sesInput := &ses.SendEmailInput{
 		Destination: &types.Destination{
-			ToAddresses: []string{ownerEmail},
+			ToAddresses: []string{input.OwnerEmail},
 		},
 		Message: &types.Message{
 			Subject: &types.Content{
@@ -134,11 +149,196 @@ func SendSweepNotificationEmail(
 		Source: aws.String(senderEmail),
 	}
 
-	_, err = client.SendEmail(ctx, input)
+	_, err = client.SendEmail(ctx, sesInput)
 	if err != nil {
-		log.Printf("Failed to send email via AWS SES to %s: %v\n", ownerEmail, err)
+		log.Printf("Failed to send email via AWS SES to %s: %v\n", input.OwnerEmail, err)
 		return
 	}
 
-	log.Printf("AWS SES email sent successfully to %s\n", ownerEmail)
+	log.Printf("AWS SES email sent successfully to %s\n", input.OwnerEmail)
+}
+
+// SendLeaseExpiryNotificationEmail ส่งอีเมลแจ้งเตือนเมื่อสัญญาเช่าใกล้หมดอายุ หรือเมื่อระบบสั่งหยุดทำงาน
+func SendLeaseExpiryNotificationEmail(input LeaseNotificationInput) {
+	ctx := context.TODO()
+
+	region := input.Region
+	if region == "" {
+		region = os.Getenv("AWS_REGION")
+		if region == "" {
+			region = "ap-southeast-1"
+		}
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+	if err != nil {
+		log.Printf("[Error] Unable to load AWS SDK config: %v\n", err)
+		return
+	}
+
+	client := ses.NewFromConfig(cfg)
+
+	senderEmail := os.Getenv("SES_SENDER_EMAIL")
+	if senderEmail == "" {
+		log.Println("[Warning] SES_SENDER_EMAIL is missing in .env. Email skipped.")
+		return
+	}
+
+	baseURL := os.Getenv("API_BASE_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:8000"
+	}
+
+	extendLink := fmt.Sprintf("%s/api/resolve-lease?id=%s&action=extend", baseURL, input.InstanceID)
+	terminateLink := fmt.Sprintf("%s/api/resolve-lease?id=%s&action=terminate", baseURL, input.InstanceID)
+
+	monthlyCost := input.CostPerDay * 30.0
+
+	var subject string
+	var headerText string
+	var warningText string
+	var actionDesc string
+	var btnText string
+	var btnClass string
+	var btnLink string
+
+	if input.IsGracePeriod {
+		subject = fmt.Sprintf("[Cloud Lifecycle] ACTION REQUIRED: Server %s stopped. Expired lease.", input.InstanceName)
+		headerText = "⚠️ Lease Expired: Server Stopped"
+		warningText = fmt.Sprintf("Your server has expired and has been STOPPED to save costs. It is now in a 7-day grace period. It will be PERMANENTLY TERMINATED on %s.", input.Deadline)
+		actionDesc = "If you still need this server and want to turn it back on, click the button below to extend the lease by 7 days. Otherwise, you can choose to terminate it immediately."
+		btnText = "Extend Lease (+7 Days)"
+		btnClass = "btn-success"
+		btnLink = extendLink
+	} else {
+		subject = fmt.Sprintf("[Cloud Lifecycle] Warning: Server %s lease is expiring soon", input.InstanceName)
+		headerText = "⏳ Server Lease Expiring Soon"
+		warningText = fmt.Sprintf("Your server lease is expiring on %s. The system will automatically STOP it to optimize cost.", input.Deadline)
+		actionDesc = "To prevent the server from being stopped, click the button below to extend your lease by 7 days."
+		btnText = "Extend Lease (+7 Days)"
+		btnClass = "btn-success"
+		btnLink = extendLink
+	}
+
+	body := fmt.Sprintf(`<!DOCTYPE html>
+	<html>
+	<head>
+		<style>
+			body { font-family: Arial, sans-serif; color: #333; line-height: 1.6; }
+			.container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; }
+			.header { background-color: #f8f9fa; padding: 15px; border-radius: 6px 6px 0 0; border-bottom: 3px solid #ffc107; }
+			.content { padding: 20px 0; }
+			.resource-box { background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 5px solid #007bff; }
+			.btn-container { text-align: center; margin: 30px 0; }
+			.btn { padding: 10px 20px; text-decoration: none; color: #fff; border-radius: 5px; font-weight: bold; display: inline-block; margin: 0 5px; }
+			.btn-danger { background-color: #d9534f; }
+			.btn-success { background-color: #5cb85c; }
+			.footer { font-size: 12px; color: #777; border-top: 1px solid #e0e0e0; padding-top: 15px; text-align: center; }
+			.warning-text { color: #dc3545; font-weight: bold; font-size: 13px; }
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<h3 style="margin: 0; color: #856404;">%s</h3>
+			</div>
+			<div class="content">
+				<p>Dear System Owner (Team: <strong>%s</strong>),</p>
+				<p>%s</p>
+				
+				<div class="resource-box">
+					<p style="margin: 5px 0;"><strong>Resource Name:</strong> %s</p>
+					<p style="margin: 5px 0;"><strong>Instance ID:</strong> <code>%s</code></p>
+					<p style="margin: 5px 0;"><strong>Cloud Provider:</strong> AWS (Region: %s)</p>
+					<p style="margin: 5px 0;"><strong>Environment Type:</strong> %s</p>
+					<p style="margin: 5px 0;"><strong>Estimated Cost Impact:</strong> ~$%.2f/day (approx. ~$%.2f/month)</p>
+					<hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 10px 0;">
+					<p style="margin: 5px 0; color: #dc3545;"><strong>Deadline:</strong> %s</p>
+				</div>
+
+				<p class="warning-text">%s</p>
+				
+				<div class="btn-container">
+					<a href="%s" class="btn %s">%s</a>
+					<a href="%s" class="btn btn-danger">Terminate Immediately</a>
+				</div>
+			</div>
+			<div class="footer">
+				<p>Cloud Lifecycle Automation System &bull; This is an automated notification.</p>
+			</div>
+		</div>
+	</body>
+	</html>`,
+		headerText, input.OwnerTeam, actionDesc, input.InstanceName, input.InstanceID, region, input.Environment, input.CostPerDay, monthlyCost, input.Deadline, warningText, btnLink, btnClass, btnText, terminateLink,
+	)
+
+	sesInput := &ses.SendEmailInput{
+		Destination: &types.Destination{
+			ToAddresses: []string{input.OwnerEmail},
+		},
+		Message: &types.Message{
+			Subject: &types.Content{
+				Data: aws.String(subject),
+			},
+			Body: &types.Body{
+				Html: &types.Content{
+					Data: aws.String(body),
+				},
+			},
+		},
+		Source: aws.String(senderEmail),
+	}
+
+	_, err = client.SendEmail(ctx, sesInput)
+	if err != nil {
+		log.Printf("Failed to send email via AWS SES to %s: %v\n", input.OwnerEmail, err)
+		return
+	}
+
+	log.Printf("AWS SES lease notification email sent successfully to %s\n", input.OwnerEmail)
+}
+
+// SendSlackAlert dispatches a formatted Slack notification to the configured Webhook URL
+func SendSlackAlert(deptName string, channel string, currentSpend float64, budget float64, status string) {
+	webhookURL := os.Getenv("SLACK_WEBHOOK_URL")
+	if webhookURL == "" {
+		log.Println("[Slack Noti] SLACK_WEBHOOK_URL not configured in environment. Skipping Slack alert.")
+		return
+	}
+
+	percent := 0.0
+	if budget > 0 {
+		percent = (currentSpend / budget) * 100.0
+	}
+
+	statusEmoji := "🔴"
+	if status == "Warning" {
+		statusEmoji = "🟡"
+	}
+
+	payloadText := fmt.Sprintf(
+		"%s *[FinOps Governance Alert - %s]*\n*Department*: %s\n*Alert Channel*: `%s`\n*Status*: %s\n*Current Spend*: $%.2f USD / *Budget*: $%.2f USD (%.1f%%)\n*Action Required*: Please review unallocated cloud resources or adjust budget threshold.",
+		statusEmoji, status, deptName, channel, status, currentSpend, budget, percent,
+	)
+
+	payload := map[string]string{
+		"text": payloadText,
+	}
+
+	jsonBytes, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("[Slack Noti Error] JSON marshal failed: %v\n", err)
+		return
+	}
+
+	// Use a client with explicit timeout to prevent goroutine leak if Slack API hangs
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	resp, err := httpClient.Post(webhookURL, "application/json", bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		log.Printf("[Slack Noti Error] Webhook POST failed: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	log.Printf("[Slack Noti Success] Dispatched %s budget alert for '%s' to Slack (%s)\n", status, deptName, channel)
 }

@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"time"
@@ -19,7 +20,7 @@ func StartCostSyncCron(db *sql.DB) {
 		log.Println("[CRON] ⏰ Starting daily AWS Cost & Usage sync...")
 		
 		// เรียกใช้ฟังก์ชันดูดข้อมูลที่เราเขียนไว้ก่อนหน้านี้
-		err := SyncAWSCostData(db)
+		err := SyncAWSCostData(context.Background(), db)
 		if err != nil {
 			log.Printf("[CRON] ❌ AWS cost sync failed: %v\n", err)
 		} else {
