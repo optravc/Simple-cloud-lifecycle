@@ -14,10 +14,26 @@ yarn-error.log*
 
 # Backend
 .env
+*.exe
+backend/api
+backend/app
+backend/db_inspect
+backend/seed_trend
+backend/main
 
-# Cloud
 
-
+# Cloud / Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 # Frontend
 /node_modules
 /.pnp
@@ -29,4 +45,4 @@ yarn-error.log*
 !.yarn/versions
 # เพิ่มตรงนี้เพื่อบล็อก Build Cache ของ Next.js
 .next/
-out/
+out/ท
