@@ -10,8 +10,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app-api ./cmd/api/mai
 
 FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates tzdata
-WORKDIR /root
+RUN apk --no-cache add ca-certificates tzdata && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
+WORKDIR /app
 COPY --from=builder /app-api ./
+
+USER appuser
 
 CMD ["./app-api"]

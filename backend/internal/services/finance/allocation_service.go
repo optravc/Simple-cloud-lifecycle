@@ -216,7 +216,7 @@ func GetProjectServiceBreakdown(ctx context.Context, db *sql.DB, projectID strin
 	}, nil
 }
 
-func NormalizeAllocationFilter(value string, fallback string) string {
+func NormalizeAllocationFilter(value, fallback string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return fallback

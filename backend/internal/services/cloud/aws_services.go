@@ -335,7 +335,7 @@ func (p *AWSProvider) fetchFallbackResourcesFromDB(restricted bool, allowedTeams
 func parseFallbackResourceRow(dbRows *sql.Rows, restricted bool, allowedTeams []string) (models.CloudResource, bool) {
 	var id, name, ownerEmail, status, dept, team string
 	var deadline sql.NullTime
-	if scanErr := dbRows.Scan(&id, &name, &ownerEmail, &status, &deadline, &dept, &team); scanErr != nil {
+	if dbRows.Scan(&id, &name, &ownerEmail, &status, &deadline, &dept, &team) != nil {
 		return models.CloudResource{}, false
 	}
 

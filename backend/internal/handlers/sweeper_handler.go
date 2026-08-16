@@ -102,8 +102,7 @@ func fetchPendingItemsFromDB(db *sql.DB, userRole, userDept string) ([]PendingIt
 
 	var items []PendingItem
 	for rows.Next() {
-		var item PendingItem
-		if scanErr := rows.Scan(&item.InstanceID, &item.InstanceName, &item.OwnerEmail, &item.Deadline); scanErr == nil {
+		if rows.Scan(&item.InstanceID, &item.InstanceName, &item.OwnerEmail, &item.Deadline) == nil {
 			items = append(items, item)
 		}
 	}
