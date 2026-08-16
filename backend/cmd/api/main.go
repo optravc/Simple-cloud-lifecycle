@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	// Import postgres driver for database/sql database interaction
 	_ "github.com/lib/pq"
 )
 

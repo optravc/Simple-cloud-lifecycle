@@ -180,36 +180,34 @@ func RequireRole(allowedRoles []string, next http.HandlerFunc) http.HandlerFunc 
 		}
 
 		userDept, _ := r.Context().Value(UserDeptKey).(string)
-		userDeptLower := strings.ToLower(userDept)
 
-		allowed := false
-
-		// Admin, FinOps, Finance roles/departments get global view permissions
-		if strings.EqualFold(userRole, "admin") {
-			allowed = true
-		} else if strings.Contains(userDeptLower, "finops") || strings.Contains(userDeptLower, "finance") {
-			for _, rVal := range allowedRoles {
-				if strings.EqualFold(rVal, "finops") || strings.EqualFold(rVal, "finance") || strings.EqualFold(rVal, "admin") {
-					allowed = true
-					break
-				}
-			}
-		} else {
-			for _, rVal := range allowedRoles {
-				if strings.EqualFold(rVal, userRole) {
-					allowed = true
-					break
-				}
-			}
-		}
-
-		if !allowed {
+		if !isRoleAllowed(userRole, userDept, allowedRoles) {
 			http.Error(w, "Forbidden: You do not have permission to perform this action", http.StatusForbidden)
 			return
 		}
 
 		next(w, r)
 	}
+}
+
+func isRoleAllowed(userRole, userDept string, allowedRoles []string) bool {
+	if strings.EqualFold(userRole, "admin") {
+		return true
+	}
+
+	userDeptLower := strings.ToLower(userDept)
+	isFinOpsDept := strings.Contains(userDeptLower, "finops") || strings.Contains(userDeptLower, "finance")
+
+	for _, rVal := range allowedRoles {
+		if isFinOpsDept {
+			if strings.EqualFold(rVal, "finops") || strings.EqualFold(rVal, "finance") || strings.EqualFold(rVal, "admin") {
+				return true
+			}
+		} else if strings.EqualFold(rVal, userRole) {
+			return true
+		}
+	}
+	return false
 }
 
 // GetUserRole เป็นฟังก์ชันดึงบทบาทผู้ใช้จาก Context
