@@ -1,14 +1,102 @@
-# custodian policy 
-policy:
-  -name: sandbox-Lifecycle
-  resource: aws.ec2
-  description:"ปิด cloud server ec2 ที่ไม่ได้ใช้เกิน 14วัน "
-  filters:
-    -"tag:Environment": sandbox
-    -type: instance-age
-    days: 14
+# ============================================================
+# Cloud Custodian Policy — Sandbox Resource Lifecycle
+# หยุด EC2 instances ที่ไม่ได้ใช้เกิน 14 วัน โดยอัตโนมัติ
+# ============================================================
+#
+# วิธีใช้:
+#   pip install c7n
+#   custodian validate custodian_policy.yml
+#   custodian run --output-dir=./output custodian_policy.yml
+#
+# ============================================================
+
+policies:
+  # ── Policy 1: Stop idle sandbox instances ─────────────────
+  - name: sandbox-lifecycle-stop-idle
+    resource: aws.ec2
+    description: >
+      ปิด EC2 instances ใน sandbox environment ที่ทำงานเกิน 14 วัน
+      โดยอัตโนมัติ เพื่อลดค่าใช้จ่าย cloud ที่ไม่จำเป็น
+    filters:
+      - type: value
+        key: "tag:Environment"
+        value: sandbox
+      - type: instance-age
+        days: 14
+        op: ge
+      - "State.Name": running
     actions:
-    - stop
-    -type: tag
-    key: Status
-    value: soft-deleted
+      - stop
+      - type: tag
+        key: Status
+        value: auto-stopped-by-custodian
+      - type: tag
+        key: StoppedDate
+        value_from:
+          url: "s3://placeholder/date"
+          format: "{now:%Y-%m-%d}"
+
+  # ── Policy 2: Notify owner before stopping ─────────────────
+  - name: sandbox-lifecycle-warn-owner
+    resource: aws.ec2
+    description: >
+      แจ้งเตือนเจ้าของ instance 3 วัน ก่อนที่จะถูก stop อัตโนมัติ
+    filters:
+      - type: value
+        key: "tag:Environment"
+        value: sandbox
+      - type: instance-age
+        days: 11
+        op: ge
+      - type: instance-age
+        days: 14
+        op: lt
+      - "State.Name": running
+    actions:
+      - type: tag
+        key: LifecycleWarning
+        value: "will-be-stopped-in-3-days"
+      # หมายเหตุ: ถ้าต้องการส่ง email ผ่าน SES
+      # ให้เพิ่ม notify action ตาม c7n documentation
+
+  # ── Policy 3: Tag untagged resources ────────────────────────
+  - name: tag-untagged-ec2
+    resource: aws.ec2
+    description: >
+      ติด tag "Owner: untagged" ให้ instances ที่ไม่มี Owner tag
+      เพื่อให้ FinOps dashboard ติดตามได้
+    filters:
+      - "tag:Owner": absent
+      - "State.Name": running
+    actions:
+      - type: tag
+        key: Owner
+        value: untagged
+      - type: tag
+        key: CostAlert
+        value: "no-owner-assigned"
+
+  # ── Policy 4: Report expensive instances ────────────────────
+  - name: report-large-instances
+    resource: aws.ec2
+    description: >
+      รายงาน instances ที่ใหญ่กว่า t3.medium ใน sandbox
+      (ไม่ควรใช้ instance ใหญ่ใน sandbox)
+    filters:
+      - type: value
+        key: "tag:Environment"
+        value: sandbox
+      - type: instance-type
+        value:
+          - t3.large
+          - t3.xlarge
+          - m5.large
+          - m5.xlarge
+          - c5.large
+          - c5.xlarge
+          - r5.large
+          - r5.xlarge
+    actions:
+      - type: tag
+        key: CostAlert
+        value: "oversized-for-sandbox"

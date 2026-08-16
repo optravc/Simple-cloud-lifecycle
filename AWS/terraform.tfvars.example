@@ -1,0 +1,44 @@
+# ============================================================
+# terraform.tfvars.example
+# คัดลอกเป็น terraform.tfvars แล้วใส่ค่าจริง
+#  อย่า commit terraform.tfvars เข้า Git
+# ============================================================
+
+# ── General ───────────────────────────────────────────────────
+aws_region    = "ap-southeast-1"
+project_name  = "simple-cloud-lifecycle"
+environment   = "sandbox"
+owner_team    = "team-alpha"
+cost_center   = "rd-department"
+
+# ── Lifecycle ─────────────────────────────────────────────────
+sandbox_expiry_days = 14
+
+# ── Networking ────────────────────────────────────────────────
+vpc_cidr             = "10.0.0.0/16"
+availability_zones   = ["ap-southeast-1a", "ap-southeast-1b"]
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+
+# ── RDS (PostgreSQL) ─────────────────────────────────────────
+db_name           = "postgres"
+db_username       = "optravc"
+db_password       = "CHANGE_ME_TO_A_STRONG_PASSWORD"  # 
+db_instance_class = "db.t3.micro"
+
+# ── EC2 / Docker Compose ─────────────────────────────────────
+app_instance_type = "t3.micro"
+app_max_instances = 2
+
+# ── Cognito ───────────────────────────────────────────────────
+cognito_user_pool_name = "simple-cloud-lifecycle-users"
+
+# ── SES ───────────────────────────────────────────────────────
+ses_sender_email = "noptrapk@gmail.com"
+
+# ── S3 ────────────────────────────────────────────────────────
+s3_reports_bucket_name = "simple-cloud-lifecycle-reports"
+
+# ── CloudWatch ────────────────────────────────────────────────
+log_retention_days = 30
+alarm_email        = "noptrapk@gmail.com"
