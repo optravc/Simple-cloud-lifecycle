@@ -12,46 +12,45 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import PieChartIcon from '@mui/icons-material/PieChart';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import { getUserInfo, UserRole } from '@/lib/auth';
+import { S3_BASE_URL } from '@/lib/api';
 
 const drawerWidth = 260;
+
+const getUserRoleLabel = (role: string, dept?: string) => {
+  if (role === 'admin') return 'Administrator';
+  if (role === 'finops') return 'FinOps';
+  if (role === 'finance') return 'Finance';
+
+  const deptPrefix = dept && dept !== 'All' ? `${dept.split(' ')[0]} ` : '';
+
+  if (role === 'lead') {
+    return `${deptPrefix}Lead`;
+  }
+  return `${deptPrefix}Developer`;
+};
 
 export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [userRole, setUserRole] = useState<UserRole>('dev');
+  const [userDept, setUserDept] = useState<string>('All');
   const [userName, setUserName] = useState<string>('User');
   const [userInitials, setUserInitials] = useState<string>('U');
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
+    const loadUserInfo = async () => {
+      const info = getUserInfo();
+      if (info) {
+        setUserRole(info.role);
+        setUserDept(info.department);
+        setUserName(info.username);
         
-        const payload = JSON.parse(jsonPayload);
-        
-        // 1. ตรวจสอบสิทธิ์จาก Cognito Groups (รองรับทั้ง Admins และ admins)
-        const groups = payload['cognito:groups'] || [];
-        if (groups.includes('Admins') || groups.includes('admins')) {
-          setIsAdmin(true);
-        }
-
-        // 2. ดึงชื่อผู้ใช้จาก Token (Cognito มักเก็บไว้ที่ username, sub หรือ email)
-        const emailOrUser = payload['cognito:username'] || payload['username'] || payload['email'] || 'User';
-        setUserName(emailOrUser);
-
-        // สร้างตัวย่อสำหรับ Avatar (เช่น เอา 2 ตัวแรกมาทำตัวพิมพ์ใหญ่)
-        const initials = emailOrUser.substring(0, 2).toUpperCase();
+        const initials = info.username.substring(0, 2).toUpperCase();
         setUserInitials(initials);
-
-      } catch (e) {
-        console.error("Failed to parse token for roles and user info", e);
       }
-    }
+    };
+    loadUserInfo();
   }, []);
 
   const handleLogout = () => {
@@ -62,14 +61,16 @@ export default function Sidebar() {
   };
 
   const menuItems = [
-    { text: 'Dashboard', path: '/dashboard', icon: <DashboardIcon />, adminOnly: false },
-    { text: 'Reports', path: '/reports', icon: <DescriptionIcon />, adminOnly: false },
-    { text: 'Performance', path: '/performance', icon: <MemoryIcon />, adminOnly: false },
-    { text: 'Budgets', path: '/budgets', icon: <AccountBalanceWalletIcon />, adminOnly: false }, 
-    { text: 'Cost Allocation', path: '/allocation', icon: <PieChartIcon />, adminOnly: false }, 
-    { text: 'Invoices', path: '/invoices', icon: <ReceiptLongIcon />, adminOnly: false }, 
-    { text: 'Manage', path: '/manage', icon: <AdminPanelSettingsIcon />, adminOnly: true },
+    { text: 'Dashboard', path: '/dashboard', icon: <DashboardIcon />, allowedRoles: ['admin', 'finops', 'finance', 'lead'] },
+    { text: 'Reports', path: '/reports', icon: <DescriptionIcon />, allowedRoles: ['admin', 'finops', 'finance', 'lead'] },
+    { text: 'Performance', path: '/performance', icon: <MemoryIcon />, allowedRoles: ['admin', 'finops', 'lead', 'dev'] },
+    { text: 'Budgets', path: '/budgets', icon: <AccountBalanceWalletIcon />, allowedRoles: ['admin', 'finops', 'finance', 'lead'] }, 
+    { text: 'Allocation', path: '/allocation', icon: <PieChartIcon />, allowedRoles: ['admin', 'finops', 'finance', 'lead'] }, 
+    { text: 'Invoices', path: '/invoices', icon: <ReceiptLongIcon />, allowedRoles: ['admin', 'finance', 'finops'] }, 
+    { text: 'Manage', path: '/manage', icon: <AdminPanelSettingsIcon />, allowedRoles: ['admin', 'finops', 'lead', 'dev'] },
   ];
+
+  const roleTextColor = userRole === 'admin' ? '#90caf9' : '#9e9e9e';
 
   return (
     <Drawer
@@ -91,13 +92,17 @@ export default function Sidebar() {
     >
       <Box>
         <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ width: 32, height: 32, bgcolor: '#1976d2', borderRadius: 1 }} />
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Simple-cloud LIFECYCLE</Typography>
+          <Box 
+            component="img"
+            src={`${S3_BASE_URL}logo/Logo.png`} 
+            sx={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 1 }} 
+          />
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Simple Cloud Lifecycle</Typography>
         </Box>
 
         <List sx={{ px: 2 }}>
           {menuItems
-            .filter((item) => !item.adminOnly || (item.adminOnly && isAdmin)) 
+            .filter((item) => item.allowedRoles.includes(userRole)) 
             .map((item) => {
               const isActive = pathname === item.path;
               return (
@@ -148,16 +153,19 @@ export default function Sidebar() {
             '&:hover': { bgcolor: 'rgba(220, 38, 38, 0.2)' }
           }}
         >
-          {/* แสดงตัวย่อ Avatar แบบไดนามิก */}
           <Avatar sx={{ width: 40, height: 40, bgcolor: '#1976d2' }}>{userInitials}</Avatar>
           <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-            {/* แสดงชื่อหรืออีเมลที่ล็อกอินจริงจาก Cognito Token */}
             <Typography variant="body2" sx={{ fontWeight: 'bold', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
               {userName}
             </Typography>
-            <Typography variant="caption" sx={{ color: isAdmin ? '#90caf9' : '#9e9e9e' }}>
-              {isAdmin ? 'Administrator' : 'Finance Viewer'}
+            <Typography variant="caption" sx={{ color: roleTextColor, display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {getUserRoleLabel(userRole, userDept)}
             </Typography>
+            {userDept && userDept !== 'All' && (
+              <Typography variant="caption" sx={{ color: '#81c784', display: 'block', fontSize: '0.72rem', fontWeight: 'bold', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                Dept: {userDept}
+              </Typography>
+            )}
           </Box>
           <LogoutIcon sx={{ fontSize: 18, color: '#9e9e9e' }} />
         </Box>

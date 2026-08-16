@@ -4,16 +4,9 @@ import React, { useState } from 'react';
 import { AuthenticationDetails, CognitoUser } from 'amazon-cognito-identity-js';
 import userPool from '@/lib/cognito';
 import { useRouter } from 'next/navigation';
-import { 
-  Box, 
-  Button, 
-  TextField, 
-  Typography, 
-  Paper, 
-  Alert,
-  InputAdornment,
-  CircularProgress
-} from '@mui/material';
+import { getUserInfo } from '@/lib/auth';
+import { Box, Button, TextField,  Typography, Paper, 
+  Alert,InputAdornment,CircularProgress} from '@mui/material';
 import CloudQueueIcon from '@mui/icons-material/CloudQueue';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
@@ -22,16 +15,15 @@ import VpnKeyIcon from '@mui/icons-material/VpnKey';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState(''); // เพิ่ม State สำหรับรหัสผ่านใหม่
-  const [requiresNewPassword, setRequiresNewPassword] = useState(false); // เช็กว่าต้องเปลี่ยนรหัสไหม
-  const [userObject, setUserObject] = useState<CognitoUser | null>(null); // เก็บ Object ผู้ใช้ไว้ใช้ตอนเปลี่ยนรหัส
+  const [newPassword, setNewPassword] = useState(''); 
+  const [requiresNewPassword, setRequiresNewPassword] = useState(false); 
+  const [userObject, setUserObject] = useState<CognitoUser | null>(null); 
   
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  // ฟังก์ชันกดปุ่ม Sign In ปกติ
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = (e: React.SyntheticEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
@@ -50,25 +42,30 @@ export default function LoginPage() {
 
     cognitoUser.authenticateUser(authenticationDetails, {
       onSuccess: (result) => {
-        const accessToken = result.getAccessToken().getJwtToken();
+        const idToken = result.getIdToken().getJwtToken();
         if (typeof window !== 'undefined') {
-          localStorage.setItem('accessToken', accessToken);
+          localStorage.setItem('accessToken', idToken);
+          const info = getUserInfo();
+          if (info?.role === 'dev') {
+            router.push('/performance');
+          } else {
+            router.push('/dashboard');
+          }
         }
-        router.push('/dashboard');
       },
       onFailure: (err) => {
         setIsLoading(false);
-        setError(err.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+        setError(err.message || 'Incorrect email or password');
       },
-      newPasswordRequired: (userAttributes, requiredAttributes) => {
+      newPasswordRequired: () => {
         setIsLoading(false);
-        setRequiresNewPassword(true); // สลับหน้าจอให้ไปกรอกรหัสใหม่
+        setRequiresNewPassword(true); // Switch view to set new password
       }
     });
   };
 
-  // ฟังก์ชันสำหรับบันทึกรหัสผ่านใหม่ (กรณีเข้าครั้งแรก)
-  const handleNewPasswordSubmit = (e: React.FormEvent) => {
+  // Function to save new password (on first login)
+  const handleNewPasswordSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!userObject) return;
     setError('');
@@ -76,15 +73,20 @@ export default function LoginPage() {
 
     userObject.completeNewPasswordChallenge(newPassword, {}, {
       onSuccess: (result) => {
-        const accessToken = result.getAccessToken().getJwtToken();
+        const idToken = result.getIdToken().getJwtToken();
         if (typeof window !== 'undefined') {
-          localStorage.setItem('accessToken', accessToken);
+          localStorage.setItem('accessToken', idToken);
+          const info = getUserInfo();
+          if (info?.role === 'dev') {
+            router.push('/performance');
+          } else {
+            router.push('/dashboard');
+          }
         }
-        router.push('/dashboard');
       },
       onFailure: (err) => {
         setIsLoading(false);
-        setError(err.message || 'ไม่สามารถตั้งรหัสผ่านใหม่ได้ กรุณาลองใหม่อีกครั้ง');
+        setError(err.message || 'Unable to set new password. Please try again.');
       }
     });
   };
@@ -142,7 +144,7 @@ export default function LoginPage() {
           </Alert>
         )}
 
-        {/* ฟอร์มสลับเปลี่ยนตามเงื่อนไข */}
+        {/* Conditional form view switch */}
         {!requiresNewPassword ? (
           <form onSubmit={handleLogin} style={{ width: '100%' }}>
             <TextField
@@ -235,7 +237,7 @@ export default function LoginPage() {
               disabled={isLoading}
               sx={{ 
                 py: 1.5, 
-                bgcolor: '#2e7d32', // เปลี่ยนเป็นสีเขียวเพื่อสื่อถึงการอัปเดตสำเร็จ
+                bgcolor: '#2e7d32',
                 fontSize: '1rem',
                 fontWeight: 'bold',
                 textTransform: 'none',

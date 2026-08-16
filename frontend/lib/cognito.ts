@@ -5,4 +5,6 @@ const poolData = {
   ClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '',
 };
 
-export default new CognitoUserPool(poolData);
+const userPool = new CognitoUserPool(poolData);
+
+export default userPool;

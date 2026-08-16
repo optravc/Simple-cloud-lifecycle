@@ -1,24 +1,33 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { 
-  Box, Grid, Card, CardContent, Typography, Button, TextField, MenuItem, Alert, CircularProgress 
-} from '@mui/material';
+import { useRouter } from 'next/navigation';
+import { Box, Grid, Alert } from '@mui/material';
+import { getUserInfo } from '@/lib/auth';
 import Sidebar from '@/layouts/sidebar';
 import Header from '@/layouts/header';
-import { PieChart, Pie, ResponsiveContainer, Tooltip } from 'recharts';
-import DownloadIcon from '@mui/icons-material/Download';
-import AllocationIsights from '@/components/allocation/AllocationIsights';
+import AllocationInsights from '@/components/allocation/AllocationInsights';
 import AllocationTable from '@/components/allocation/AllocationTable';
-import { AllocationItem, AllocationSummary } from '@/types/cloud';
+import AllocationFilterToolbar from '@/components/allocation/AllocationFilterToolbar';
+import AllocationDonutChart from '@/components/allocation/AllocationDonutChart';
+import { AllocationItem, AllocationSummary } from '@/types/allocation';
 import { getCostAllocationData } from '@/lib/api';
 
 const drawerWidth = 260;
-
-// 1. ประกาศ COLORS ไว้ด้านบนสุดตรงนี้ (แก้ปัญหา Uncaught ReferenceError)
-const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#00bcd4'];
+const COLORS = ['#2065D1', '#826af9', '#FFAB00', '#2ea043', '#d32f2f', '#00bcd4', '#9c27b0'];
+const DEPARTMENT_COLORS: Record<string, string> = {
+  'Core Infrastructure': '#2065D1',
+  'Product Engineering': '#826af9',
+  'Data Science & Analytics': '#FFAB00',
+  'Trust & Safety': '#2ea043',
+  'Finance': '#d32f2f',
+  'Executive / C-Level': '#00bcd4',
+  'FinOps & Cloud Governance': '#9c27b0',
+};
 
 export default function CostAllocationPage() {
+  const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
   const [selectedDept, setSelectedDept] = useState<string>('All');
   const [tagFilter, setTagFilter] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -31,6 +40,17 @@ export default function CostAllocationPage() {
     let cancelled = false;
 
     const loadAllocationData = async () => {
+      const info = getUserInfo();
+      if (!info) {
+        router.push('/login');
+        return;
+      }
+      if (info.role === 'dev') {
+        router.push('/dashboard');
+        return;
+      }
+      setIsAuthorized(true);
+
       try {
         setLoading(true);
         const data = await getCostAllocationData();
@@ -47,7 +67,7 @@ export default function CostAllocationPage() {
         }
 
         console.error('Error fetching allocation data:', err);
-        setError('ไม่สามารถดึงข้อมูล Cost Allocation จาก backend ได้');
+        setError('Failed to fetch Cost Allocation data from backend');
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -60,7 +80,7 @@ export default function CostAllocationPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   const filteredAllocations = allocations.filter((item) => {
     const matchDept = selectedDept === 'All' || item.department === selectedDept;
@@ -74,15 +94,64 @@ export default function CostAllocationPage() {
     ? (summary?.departments ?? []).map((item) => ({ name: item.department, value: item.spend }))
     : filteredAllocations.map((item) => ({ name: item.projectName, value: item.spend }));
 
-  // 2. ตอนนี้สามารถเรียกใช้ COLORS ด้านล่างนี้ได้อย่างถูกต้องแล้ว
-  const pieDataWithColors = pieData.map((entry, index) => ({
-    ...entry,
-    fill: COLORS[index % COLORS.length],
-  }));
+  const pieDataWithColors = pieData.map((entry, index) => {
+    if (selectedDept === 'All') {
+      return {
+        ...entry,
+        fill: DEPARTMENT_COLORS[entry.name] || COLORS[index % COLORS.length],
+      };
+    }
+    return {
+      ...entry,
+      fill: COLORS[index % COLORS.length],
+    };
+  });
+
+  // Calculate statistics by selected department
+  const deptAllocations = allocations.filter(
+    (item) => selectedDept === 'All' || item.department === selectedDept
+  );
+  const deptTaggedCount = deptAllocations.filter((item) => item.isTagged).length;
+  const deptUntaggedCount = deptAllocations.length - deptTaggedCount;
+  const deptComplianceRate = deptAllocations.length > 0 
+    ? (deptTaggedCount / deptAllocations.length) * 100 
+    : 0;
+  const deptAverageMomChange = deptAllocations.length > 0 
+    ? deptAllocations.reduce((sum, item) => sum + item.momChange, 0) / deptAllocations.length 
+    : 0;
 
   const handleExportReport = () => {
-    alert('Exporting Enterprise Cost Allocation & Chargeback Report (CSV)...');
+    if (filteredAllocations.length === 0) return;
+
+    const headers = ['Department', 'Project Name', 'Project ID', 'Owner', 'Provider', 'Allocation Model', 'Tag Status', 'MoM Change', 'Current Spend'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredAllocations.map(item => [
+        `"${item.department}"`,
+        `"${item.projectName}"`,
+        `"${item.id}"`,
+        `"${item.owner}"`,
+        `"${item.provider}"`,
+        `"${item.allocationModel}"`,
+        item.isTagged ? 'Tagged' : 'Untagged',
+        `"${item.momChange}%"`,
+        item.spend
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Cost_Allocation_Report_${selectedDept.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
+
+  if (!isAuthorized) {
+    return null;
+  }
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8f9fa' }}>
@@ -91,125 +160,52 @@ export default function CostAllocationPage() {
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', width: `calc(100% - ${drawerWidth}px)` }}>
         <Header />
 
-        <Box sx={{ p: 4 }}>
+        <Box sx={{ p: 2.5 }}>
           {error && (
-            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 2, py: 0.5 }}>
               {error}
             </Alert>
           )}
 
-          {/* Header Section */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#1a202c' }}>
-                Cost Allocation & Showback
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                วิเคราะห์และกระจายสัดส่วนค่าใช้จ่ายคลาวด์จำแนกตามแผนกและโปรเจกต์
-              </Typography>
-            </Box>
+          {/* Header & Filter Bar Toolbar Component */}
+          <AllocationFilterToolbar
+            selectedDept={selectedDept}
+            onDeptChange={setSelectedDept}
+            tagFilter={tagFilter}
+            onTagFilterChange={setTagFilter}
+            onExport={handleExportReport}
+            disableExport={filteredAllocations.length === 0}
+          />
 
-            <Button 
-              variant="contained" 
-              startIcon={<DownloadIcon />} 
-              onClick={handleExportReport}
-              sx={{ borderRadius: 2, textTransform: 'none' }}
-            >
-              Export Report
-            </Button>
-          </Box>
+          {/* Top Component: Horizontal Governance Stat Banner Bar */}
+          <AllocationInsights
+            selectedDept={selectedDept}
+            complianceRate={deptComplianceRate}
+            taggedCount={deptTaggedCount}
+            untaggedCount={deptUntaggedCount}
+            averageMomChange={deptAverageMomChange}
+          />
 
-          {/* Filter Bar */}
-          <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-            <TextField
-              select
-              size="small"
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              sx={{ minWidth: 220, bgcolor: 'white', borderRadius: 2 }}
-            >
-              <MenuItem value="All">All Departments (ภาพรวมทุกแผนก)</MenuItem>
-              <MenuItem value="Engineering & R&D">Engineering & R&D</MenuItem>
-              <MenuItem value="Data & AI Platform">Data & AI Platform</MenuItem>
-              <MenuItem value="Marketing & Analytics">Marketing & Analytics</MenuItem>
-            </TextField>
-
-            <TextField
-              select
-              size="small"
-              value={tagFilter}
-              onChange={(e) => setTagFilter(e.target.value)}
-              sx={{ minWidth: 200, bgcolor: 'white', borderRadius: 2 }}
-            >
-              <MenuItem value="All">All Tag Status</MenuItem>
-              <MenuItem value="Tagged">Tagged (ติดแท็กครบถ้วน)</MenuItem>
-              <MenuItem value="Untagged">Untagged (ยังไม่ติดแท็ก)</MenuItem>
-            </TextField>
-          </Box>
-
-          {/* Grid: Charts & Insights Component */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Card elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 3, height: '100%', p: 2 }}>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
-                    {selectedDept === 'All' ? 'Spending by Departments' : `Spending by Projects (${selectedDept})`}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                    {selectedDept === 'All' ? 'สัดส่วนค่าใช้จ่ายภาพรวมแยกตามแผนกหลัก' : 'สัดส่วนค่าใช้จ่ายรายโปรเจกต์ภายใต้แผนกที่เลือก'}
-                  </Typography>
-                  
-                  <Box sx={{ width: '100%', height: 200 }}>
-                    {loading ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                        <CircularProgress size={28} />
-                      </Box>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={pieDataWithColors} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={75} paddingAngle={5} />
-                          <Tooltip formatter={(value) => {
-                            const numericValue = Number(value ?? 0);
-                            return [`$${numericValue.toLocaleString()}`, 'Spend'];
-                          }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    )}
-                  </Box>
-
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
-                    {pieData.map((item, idx) => (
-                      <Box key={item.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box sx={{ width: 10, height: 10, bgcolor: COLORS[idx % COLORS.length], borderRadius: '50%' }} />
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>{item.name}</Typography>
-                        </Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>${item.value.toLocaleString()}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                </CardContent>
-              </Card>
+          {/* Main 2-Column Split: AllocationTable on Left (7.5), Donut Chart on Right (4.5) */}
+          <Grid container spacing={2.5}>
+            {/* Left Column: Cost Allocation Details Table */}
+            <Grid size={{ xs: 12, md: 7.5 }}>
+              <AllocationTable 
+                allocations={filteredAllocations} 
+                searchTerm={searchTerm} 
+                setSearchTerm={setSearchTerm} 
+              />
             </Grid>
 
-            {/* เรียกใช้งาน Insights Component ที่แยกออกมา */}
-            <Grid size={{ xs: 12, md: 7 }}>
-              <AllocationIsights
+            {/* Right Column: Spending Donut Chart Component */}
+            <Grid size={{ xs: 12, md: 4.5 }}>
+              <AllocationDonutChart
                 selectedDept={selectedDept}
-                complianceRate={summary?.complianceRate ?? 0}
-                taggedCount={summary?.taggedCount ?? 0}
-                untaggedCount={summary?.untaggedCount ?? 0}
-                averageMomChange={summary?.averageMomChange ?? 0}
+                pieDataWithColors={pieDataWithColors}
+                loading={loading}
               />
             </Grid>
           </Grid>
-
-          {/* เรียกใช้งาน Table Component ที่แยกออกมา */}
-          <AllocationTable 
-            allocations={filteredAllocations} 
-            searchTerm={searchTerm} 
-            setSearchTerm={setSearchTerm} 
-          />
         </Box>
       </Box>
     </Box>

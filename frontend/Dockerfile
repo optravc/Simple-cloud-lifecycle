@@ -8,7 +8,19 @@ RUN npm ci
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY  --from=deps /app/node_modules ./node_modules
+# Accept build arguments for environment variables
+ARG NEXT_PUBLIC_AWS_REGION
+ARG NEXT_PUBLIC_COGNITO_USER_POOL_ID
+ARG NEXT_PUBLIC_COGNITO_CLIENT_ID
+ARG NEXT_PUBLIC_API_URL
+
+# Set env variables so they are embedded during next build
+ENV NEXT_PUBLIC_AWS_REGION=${NEXT_PUBLIC_AWS_REGION}
+ENV NEXT_PUBLIC_COGNITO_USER_POOL_ID=${NEXT_PUBLIC_COGNITO_USER_POOL_ID}
+ENV NEXT_PUBLIC_COGNITO_CLIENT_ID=${NEXT_PUBLIC_COGNITO_CLIENT_ID}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
