@@ -45,4 +45,9 @@ override.tf.json
 !.yarn/versions
 # เพิ่มตรงนี้เพื่อบล็อก Build Cache ของ Next.js
 .next/
-out/ท
+out/
+
+# AWS Temp & Log Files
+AWS/.infracost/
+AWS/ssm_out.txt
+AWS/ssm_params.json
