@@ -129,20 +129,14 @@ cd /opt/app/repo
 # Copy .env to backend
 cp /opt/app/.env backend/.env
 
-# ── Docker Compose — build & run ──────────────────────────────
-echo "--- Starting docker compose (build + up) ---"
-# จำกัด Go compiler ให้ใช้ CPU core เดียว + GC เร็วขึ้น เพื่อประหยัด RAM บน t3.micro
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
+# ── ECR Login & Fast Deploy ────────────────────────────────────
+echo "--- Logging in to AWS ECR ---"
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin 439855819034.dkr.ecr.ap-southeast-1.amazonaws.com
 
-# build backend ก่อน แล้วค่อย frontend เพื่อไม่ให้ RAM ชนกัน
-docker compose build --no-cache \
-  --build-arg GOGC=50 \
-  --build-arg GOMAXPROCS=1 \
-  backend-api 2>&1 | tee /var/log/app/deploy.log
+echo "--- Pulling pre-built images from ECR (Fast Deploy ~10s) ---"
+docker compose pull 2>&1 | tee /var/log/app/deploy.log
 
-docker compose build --no-cache frontend-web 2>&1 | tee -a /var/log/app/deploy.log
-
+echo "--- Starting containers ---"
 docker compose up -d 2>&1 | tee -a /var/log/app/deploy.log
 
 # ── Redirect container logs to files ──────────────────────────

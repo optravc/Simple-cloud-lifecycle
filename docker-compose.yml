@@ -5,10 +5,7 @@ services:
   # 1. ส่วนของ Backend (Go)
   # ==============================
   backend-api:
-    image: simple-cloud-lifecycle-backend:latest
-    build: 
-      context: ./backend    
-      dockerfile: Dockerfile 
+    image: 439855819034.dkr.ecr.ap-southeast-1.amazonaws.com/scl-sandbox-backend:latest
     container_name: lifecycle_backend
     ports:
       - "8080:8000"         
@@ -18,15 +15,7 @@ services:
   # 2. ส่วนของ Frontend (Next.js)
   # ==============================
   frontend-web:
-    image: simple-cloud-lifecycle-frontend:latest
-    build:
-      context: ./frontend   
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_AWS_REGION=${NEXT_PUBLIC_AWS_REGION:-ap-southeast-1}
-        - NEXT_PUBLIC_COGNITO_USER_POOL_ID=${NEXT_PUBLIC_COGNITO_USER_POOL_ID:-ap-southeast-1_ZXVLGZxhZ}
-        - NEXT_PUBLIC_COGNITO_CLIENT_ID=${NEXT_PUBLIC_COGNITO_CLIENT_ID:-6l698lageen7c6ogkbeo6lj1ve}
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080/api}
+    image: 439855819034.dkr.ecr.ap-southeast-1.amazonaws.com/scl-sandbox-frontend:latest
     container_name: lifecycle_frontend
     ports:
       - "3000:3000"       

@@ -9,10 +9,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Accept build arguments for environment variables
-ARG NEXT_PUBLIC_AWS_REGION
-ARG NEXT_PUBLIC_COGNITO_USER_POOL_ID
-ARG NEXT_PUBLIC_COGNITO_CLIENT_ID
-ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_AWS_REGION=ap-southeast-1
+ARG NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-southeast-1_livhXX82E
+ARG NEXT_PUBLIC_COGNITO_CLIENT_ID=4ojfv0k57ar8btdf2fimm1sjn
+ARG NEXT_PUBLIC_API_URL=/api
 
 # Set env variables so they are embedded during next build
 ENV NEXT_PUBLIC_AWS_REGION=${NEXT_PUBLIC_AWS_REGION}
