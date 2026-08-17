@@ -7,6 +7,8 @@ services:
   backend-api:
     image: 439855819034.dkr.ecr.ap-southeast-1.amazonaws.com/scl-sandbox-backend:latest
     container_name: lifecycle_backend
+    env_file:
+      - ./backend/.env
     ports:
       - "8080:8000"         
     restart: always
