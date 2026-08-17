@@ -58,6 +58,30 @@ locals {
 
 # ── AMI — Amazon Linux 2023 (auto-resolved) ──────────────────
 
+# ── Amazon Container Registry (ECR) ───────────────────────────
+
+resource "aws_ecr_repository" "backend" {
+  name                 = "${local.name_prefix}-backend"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = false
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_ecr_repository" "frontend" {
+  name                 = "${local.name_prefix}-frontend"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = false
+  }
+
+  tags = local.common_tags
+}
+
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -132,7 +156,7 @@ resource "aws_lb_target_group" "frontend" {
     unhealthy_threshold = 3
     timeout             = 5
     interval            = 30
-    matcher             = "200,301,302,304,404"
+    matcher             = "200-399,404"
   }
 
   tags = local.common_tags

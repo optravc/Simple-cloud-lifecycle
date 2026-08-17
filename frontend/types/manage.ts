@@ -19,6 +19,7 @@ export interface PreviewData {
   items_to_sweep: number;
   potential_savings: number;
   instances: CloudResource[]; 
+  threshold_days?: number;
 }
 
 export interface InstanceSweepSetting {
@@ -118,6 +119,8 @@ export interface ResourceTableProps {
   userRole?: string;
   onActionSuccess?: () => void;
   optimizerData?: import('./optimizer').OptimizerSummary | null;
+  idleThreshold?: number;
+  onChangeThreshold?: (days: number) => void;
 }
 
 export interface SpendingByDeptCardProps {

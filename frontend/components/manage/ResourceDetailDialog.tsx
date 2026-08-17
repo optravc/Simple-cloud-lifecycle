@@ -51,6 +51,11 @@ export default function ResourceDetailDialog({
 
   if (!resource) return null;
 
+  const isProtected = (resource.Environment || '').toLowerCase() === 'permanent' ||
+    (resource.Name || '').toLowerCase().includes('app-server') ||
+    (resource.Name || '').toLowerCase().includes('scl-sandbox') ||
+    resource.ID === 'i-04ab766b1b53e5bab';
+
   const currentStatus = statusOverride || resource.Status || 'ACTIVE';
 
   const formatDeadline = (deadlineStr?: string) => {
@@ -260,6 +265,12 @@ export default function ResourceDetailDialog({
           Close
         </Button>
 
+        {isProtected && (
+          <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+            🔒 <strong>Protected Infrastructure:</strong> Primary application server running the system. Stop and Sweep actions are disabled to prevent service downtime.
+          </Alert>
+        )}
+
         {canAction && (
           <Box sx={{ display: 'flex', gap: 1 }}>
             {currentStatus === 'STOPPED' ? (
@@ -280,7 +291,7 @@ export default function ResourceDetailDialog({
                 color="warning"
                 size="small"
                 startIcon={actionLoading === 'stop' ? <CircularProgress size={16} color="inherit" /> : <StopIcon />}
-                disabled={actionLoading !== null}
+                disabled={actionLoading !== null || isProtected}
                 onClick={handleStop}
                 sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
               >

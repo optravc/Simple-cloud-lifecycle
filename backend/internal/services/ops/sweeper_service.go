@@ -17,15 +17,47 @@ import (
 // ใช้ค่าเดียวกันทั้ง Manual (UI) และ CRON เพื่อความสอดคล้อง
 const IDLE_THRESHOLD_DAYS = 14
 
-// GetEffectiveThreshold คืนค่า threshold จริงที่จะใช้
-// ตัวอย่าง: SWEEP_IDLE_OVERRIDE=1 ทำให้ทดสอบได้โดยไม่ต้องรอ 14 วัน
-func GetEffectiveThreshold() int {
+// InitSystemSettings ensures that system_settings table exists and has default values
+func InitSystemSettings(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS system_settings (
+			key VARCHAR(100) PRIMARY KEY,
+			value VARCHAR(255) NOT NULL,
+			description TEXT,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_by VARCHAR(255)
+		);
+		INSERT INTO system_settings (key, value, description)
+		VALUES ('idle_threshold_days', '14', 'Minimum idle days before an instance is flagged for sweep')
+		ON CONFLICT (key) DO NOTHING;
+	`)
+	if err != nil {
+		log.Printf("[System Settings] Warning: Failed to init system_settings table: %v", err)
+	}
+}
+
+// GetEffectiveThreshold คืนค่า threshold จริงที่จะใช้ โดยดึงจาก DB หรือ Env Override
+func GetEffectiveThreshold(db *sql.DB) int {
 	if override := os.Getenv("SWEEP_IDLE_OVERRIDE"); override != "" {
 		if val, err := strconv.Atoi(override); err == nil && val > 0 {
 			log.Printf("[Warning] SWEEP_IDLE_OVERRIDE is set to %d days (testing mode)", val)
 			return val
 		}
 	}
+
+	if db != nil {
+		var valStr string
+		err := db.QueryRow("SELECT value FROM system_settings WHERE key = 'idle_threshold_days'").Scan(&valStr)
+		if err == nil && valStr != "" {
+			if val, err := strconv.Atoi(valStr); err == nil && val > 0 {
+				return val
+			}
+		}
+	}
+
 	return IDLE_THRESHOLD_DAYS
 }
 
@@ -50,6 +82,7 @@ func GetAllResources(ctx context.Context, db *sql.DB) []models.CloudResource {
 
 // scanandsweep auto sweep idle resources at 8am BKK time
 func StartSweeperCron(db *sql.DB) {
+	InitSystemSettings(db)
 	bkkTime := time.FixedZone("BKK", 7*60*60)
 	c := cron.New(cron.WithLocation(bkkTime))
 
@@ -73,11 +106,14 @@ func StartSweeperCron(db *sql.DB) {
 
 // DryRunScan สแกนหาเครื่องที่เข้าเกณฑ์ Idle แต่ยังไม่ทำการ flag หรือส่ง email ใดๆ
 // ใช้สำหรับแสดง Preview ให้ผู้ใช้เห็นก่อนยืนยัน Sweep
-func DryRunScan(resources []models.CloudResource) []models.CloudResource {
-	threshold := GetEffectiveThreshold()
+func DryRunScan(resources []models.CloudResource, db *sql.DB) []models.CloudResource {
+	threshold := GetEffectiveThreshold(db)
 	var idleResources []models.CloudResource
 
 	for _, res := range resources {
+		if cloud.IsProtectedSystemResource(res) {
+			continue
+		}
 		if res.DayIdle >= threshold && res.Status == "ACTIVE" {
 			idleResources = append(idleResources, res)
 		}
@@ -110,6 +146,10 @@ func SweepSelectedInstances(ctx context.Context, db *sql.DB, selections []SweepS
 		res, exists := resMap[sel.InstanceID]
 		if !exists {
 			log.Printf("[Sweep Error] Selected instance %s not found on AWS, skipping\n", sel.InstanceID)
+			continue
+		}
+		if cloud.IsProtectedSystemResource(res) {
+			log.Printf("[Sweep Protected] Instance %s (%s) is protected infrastructure server and cannot be swept, skipping\n", res.ID, res.Name)
 			continue
 		}
 

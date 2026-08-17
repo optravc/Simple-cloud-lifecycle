@@ -153,6 +153,14 @@ func Routes(db *sql.DB) *http.ServeMux {
 		middleware.RequireRole([]string{"admin", "finance", "finops", "lead"}, handlers.GetSavingsPlansRecommendationsHandler(db)),
 	)))
 
+	// System Settings API (Dynamic Idle Threshold)
+	mux.HandleFunc("/api/settings", corsMiddleware(middleware.AuthMiddleware(
+		middleware.RequireRole([]string{"admin", "finance", "finops", "lead", "dev"}, handlers.GetSettingsHandler(db)),
+	)))
+	mux.HandleFunc("/api/settings/idle-threshold", corsMiddleware(middleware.AuthMiddleware(
+		middleware.RequireRole([]string{"admin", "finops"}, handlers.UpdateThresholdHandler(db)),
+	)))
+
 
 
 	// (Optional) เปิด API บางเส้นให้เข้าถึงได้โดยไม่ต้อง Login เช่น /api/health

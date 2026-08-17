@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, Box, Typography, Button, TableContainer, Table,
   TableHead, TableRow, TableCell, TableBody, CircularProgress,
-  IconButton, Tooltip, TablePagination
+  IconButton, Tooltip, TablePagination, FormControl, Select, MenuItem, InputLabel
 } from '@mui/material';
 import RecyclingIcon from '@mui/icons-material/Recycling';
 import SearchIcon from '@mui/icons-material/Search';
@@ -40,6 +40,8 @@ export default function ResourceTable({
   onScanAndSweep,
   userRole = 'dev',
   onActionSuccess,
+  idleThreshold = 14,
+  onChangeThreshold,
 }: Readonly<ResourceTableProps>) {
   const [selectedResource, setSelectedResource] = useState<CloudResource | null>(null);
   const [isInspectOpen, setIsInspectOpen] = useState<boolean>(false);
@@ -93,7 +95,7 @@ export default function ResourceTable({
   return (
     <Card elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 3 }}>
       <CardContent sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1a202c' }}>
               Active Cloud Resources
@@ -104,16 +106,37 @@ export default function ResourceTable({
           </Box>
 
           {canSweep && (
-            <Button
-              variant="contained"
-              color="warning"
-              startIcon={<RecyclingIcon />}
-              onClick={onScanAndSweep}
-              disabled={loading}
-              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 'bold' }}
-            >
-              Trigger Scan & Sweep
-            </Button>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel id="threshold-select-label" sx={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                  Idle Limit
+                </InputLabel>
+                <Select
+                  labelId="threshold-select-label"
+                  value={idleThreshold}
+                  label="Idle Limit"
+                  onChange={(e) => onChangeThreshold && onChangeThreshold(Number(e.target.value))}
+                  sx={{ borderRadius: 2, fontSize: '0.825rem', fontWeight: 700 }}
+                >
+                  <MenuItem value={1}>1 Day (Testing Mode)</MenuItem>
+                  <MenuItem value={3}>3 Days</MenuItem>
+                  <MenuItem value={7}>7 Days</MenuItem>
+                  <MenuItem value={14}>14 Days (Default)</MenuItem>
+                  <MenuItem value={30}>30 Days</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Button
+                variant="contained"
+                color="warning"
+                startIcon={<RecyclingIcon />}
+                onClick={onScanAndSweep}
+                disabled={loading}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 'bold', whiteSpace: 'nowrap' }}
+              >
+                Trigger Scan & Sweep
+              </Button>
+            </Box>
           )}
         </Box>
 

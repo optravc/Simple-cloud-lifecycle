@@ -25,7 +25,7 @@ type PendingItem struct {
 func calculatePotentialSavings(ctx context.Context, db *sql.DB) float64 {
 	resources := ops.GetAllResources(ctx, db)
 	var potentialSavingsDaily float64
-	threshold := ops.GetEffectiveThreshold()
+	threshold := ops.GetEffectiveThreshold(db)
 	for _, res := range resources {
 		if res.DayIdle >= threshold && res.Status == "ACTIVE" {
 			potentialSavingsDaily += res.CostPerDay
@@ -126,7 +126,7 @@ func ScanDryRunHandler(db *sql.DB) http.HandlerFunc {
 		resources := ops.GetAllResources(r.Context(), db)
 
 		// Dry Run: แค่นับและรายงาน ไม่ flag ไม่ส่ง email
-		idleResources := ops.DryRunScan(resources)
+		idleResources := ops.DryRunScan(resources, db)
 		count := len(idleResources)
 		
 		var totalSavings float64
@@ -139,7 +139,7 @@ func ScanDryRunHandler(db *sql.DB) http.HandlerFunc {
 			"items_to_sweep":    count,
 			"potential_savings": totalSavings,
 			"instances":         idleResources,
-			"threshold_days":    ops.IDLE_THRESHOLD_DAYS,
+			"threshold_days":    ops.GetEffectiveThreshold(db),
 		}
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")

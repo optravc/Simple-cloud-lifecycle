@@ -18,7 +18,7 @@ func CalROI(resource []models.CloudResource) models.ROIResult {
 	idleCount := 0
 	softDeletedCount := 0
 
-	idleThreshold := ops.GetEffectiveThreshold()
+	idleThreshold := ops.GetEffectiveThreshold(nil)
 
 	for _, r := range resource {
 		switch strings.ToLower(r.Status) {

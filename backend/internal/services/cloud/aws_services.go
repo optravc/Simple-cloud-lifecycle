@@ -129,6 +129,21 @@ func calculateCostPerDay(instanceType string) float64 {
 	}
 }
 
+// IsProtectedSystemResource checks if instance is critical core infrastructure that must never be stopped or swept
+func IsProtectedSystemResource(res models.CloudResource) bool {
+	nameLower := strings.ToLower(res.Name)
+	envLower := strings.ToLower(res.Environment)
+	idLower := strings.ToLower(res.ID)
+	ownerLower := strings.ToLower(res.Owner)
+
+	return strings.Contains(nameLower, "app-server") ||
+		strings.Contains(nameLower, "scl-sandbox") ||
+		strings.Contains(nameLower, "permanent") ||
+		strings.EqualFold(envLower, "permanent") ||
+		strings.EqualFold(ownerLower, "permanent") ||
+		idLower == "i-04ab766b1b53e5bab"
+}
+
 // mapEC2InstanceToResource maps a single EC2 Instance type to Models.CloudResource
 func mapEC2InstanceToResource(instance ec2types.Instance, teamDetails map[string]teamDetail) models.CloudResource {
 	id := *instance.InstanceId
@@ -137,6 +152,17 @@ func mapEC2InstanceToResource(instance ec2types.Instance, teamDetails map[string
 	name, ownerTag, environment, description := parseInstanceTags(instance.Tags)
 	ownerEmail, departmentName := lookupOwnerAndDept(ownerTag, teamDetails)
 	
+	// Mark primary application server instance as Permanent Core Infrastructure
+	if id == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(name), "app-server") || strings.Contains(strings.ToLower(name), "scl-sandbox") {
+		environment = "Permanent"
+		ownerTag = "Infra Team"
+		ownerEmail = "noptrapk+infra.lead@gmail.com"
+		departmentName = "Core Infrastructure"
+		if description == "" {
+			description = "Primary Cloud Lifecycle Application & Backend API Server"
+		}
+	}
+
 	dayIdle := calculateIdleDays(instance.LaunchTime, awsState)
 	status := determineResourceStatus(awsState)
 	if status == "TERMINATED" {
@@ -275,6 +301,11 @@ func (p *AWSProvider) processEC2Instances(
 	for _, reservation := range output.Reservations {
 		for _, instance := range reservation.Instances {
 			if r, ok := p.processSingleEC2Instance(instance, teamDetails, restricted, allowedTeams, userDept); ok {
+				// ซ่อนเครื่อง App Server หลัก (scl-sandbox-app-server) ไม่ให้แสดงในตาราง Manage ป้องกันคนกดลบ
+				if r.ID == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(r.Name), "app-server") || strings.Contains(strings.ToLower(r.Name), "scl-sandbox") {
+					log.Printf("[AWS Security] Hiding primary app server instance %s (%s) from Manage table\n", r.ID, r.Name)
+					continue
+				}
 				resources = append(resources, r)
 			}
 		}
@@ -317,6 +348,8 @@ func (p *AWSProvider) fetchFallbackResourcesFromDB(restricted bool, allowedTeams
 		LEFT JOIN teams t ON LOWER(t.contact_email) = LOWER(st.owner_email)
 		LEFT JOIN departments d ON t.department_id = d.id
 		WHERE st.status != 'TERMINATED' AND st.status != 'ARCHIVED'
+		  AND st.instance_id != 'i-04ab766b1b53e5bab'
+		  AND LOWER(st.instance_name) NOT LIKE '%app-server%'
 	`)
 	if err != nil {
 		return nil
@@ -372,6 +405,10 @@ func (p *AWSProvider) ProcessIdleResources(ctx context.Context) {
 	deadlineStr := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
 
 	for _, res := range resources {
+		if IsProtectedSystemResource(res) {
+			log.Printf("[FinOps Protection] Skipping idle scan/alert for permanent system instance: %s (%s)\n", res.ID, res.Name)
+			continue
+		}
 		if res.Status == "ACTIVE" && res.DayIdle >= 14 {
 			noti.SendSweepNotificationEmail(noti.EmailNotificationInput{
 				OwnerEmail:   res.OwnerEmail,
@@ -447,6 +484,10 @@ func retainEBSVolume(ctx context.Context, client *ec2.Client, instanceID string)
 
 // SweepEC2Instances terminate instance พร้อมรองรับ Create AMI และ Retain EBS ตาม settings
 func SweepEC2Instances(ctx context.Context, instanceID string, settings SweepSettings) error {
+	if instanceID == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(instanceID), "app-server") {
+		return fmt.Errorf("action blocked: instance %s is critical core system infrastructure and cannot be swept", instanceID)
+	}
+
 	cfg, err := GetAWSConfig(ctx)
 	if err != nil {
 		log.Printf("[AWS Error] Load Config Failed in Sweep: %v\n", err)
@@ -477,7 +518,16 @@ func SweepEC2Instances(ctx context.Context, instanceID string, settings SweepSet
 
 // TerminateEC2Instances ใช้สำหรับ backward compatibility (ResolveSweepHandler)
 func TerminateEC2Instances(ctx context.Context, instanceIDs []string) error {
-	if len(instanceIDs) == 0 {
+	var allowedIDs []string
+	for _, id := range instanceIDs {
+		if id == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(id), "app-server") {
+			log.Printf("[FinOps Protection] Blocked termination of core system instance: %s\n", id)
+			continue
+		}
+		allowedIDs = append(allowedIDs, id)
+	}
+
+	if len(allowedIDs) == 0 {
 		return nil
 	}
 
@@ -489,16 +539,16 @@ func TerminateEC2Instances(ctx context.Context, instanceIDs []string) error {
 
 	client := ec2.NewFromConfig(cfg)
 	input := &ec2.TerminateInstancesInput{
-		InstanceIds: instanceIDs,
+		InstanceIds: allowedIDs,
 	}
 
 	_, err = client.TerminateInstances(ctx, input)
 	if err != nil {
-		log.Printf("[AWS Error] Failed to terminate instances %v: %v\n", instanceIDs, err)
+		log.Printf("[AWS Error] Failed to terminate instances %v: %v\n", allowedIDs, err)
 		return err
 	}
 
-	log.Printf("[FinOps Action] Successfully sent termination request for instances: %v\n", instanceIDs)
+	log.Printf("[FinOps Action] Successfully sent termination request for instances: %v\n", allowedIDs)
 	return nil
 }
 
@@ -523,6 +573,10 @@ func StartEC2Instance(ctx context.Context, instanceID string) error {
 
 // StopEC2Instance สั่งปิดเครื่อง EC2 — returns actual AWS error to caller
 func StopEC2Instance(ctx context.Context, instanceID string) error {
+	if instanceID == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(instanceID), "app-server") {
+		return fmt.Errorf("action blocked: instance %s is critical core system infrastructure and cannot be stopped", instanceID)
+	}
+
 	cfg, err := GetAWSConfig(ctx)
 	if err != nil {
 		log.Printf("[AWS Error] Failed to load AWS config for StopInstances %s: %v\n", instanceID, err)

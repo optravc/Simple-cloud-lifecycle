@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -87,6 +88,12 @@ func getRunningInstances(ctx context.Context, client *ec2.Client) ([]tempInstanc
 					name = aws.ToString(tag.Value)
 					break
 				}
+			}
+
+			// Exclude core application server (scl-sandbox-app-server / i-04ab766b1b53e5bab) from performance metrics
+			nameLower := strings.ToLower(name)
+			if instanceID == "i-04ab766b1b53e5bab" || strings.Contains(nameLower, "app-server") || strings.Contains(nameLower, "scl-sandbox") {
+				continue
 			}
 
 			targetInstances = append(targetInstances, tempInstance{

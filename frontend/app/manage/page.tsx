@@ -42,6 +42,7 @@ export default function ManagePage() {
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
   // Preview data from Dry Run scan
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [idleThreshold, setIdleThreshold] = useState<number>(14);
 
   // State สำหรับ Dialog สร้างเครื่องใหม่
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
@@ -171,6 +172,26 @@ export default function ManagePage() {
       }
     };
 
+    const loadSettings = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch(`${API_BASE}/settings`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.idle_threshold_days) {
+            setIdleThreshold(data.idle_threshold_days);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching settings:', err);
+      }
+    };
+
     const checkAuthAndLoad = async () => {
       const info = getUserInfo();
       if (!info) {
@@ -185,10 +206,11 @@ export default function ManagePage() {
       if (info.department) setUserDept(info.department);
       setIsAuthorized(true);
 
-      await loadResources();
-      await loadTeams();
+      loadResources();
+      loadTeams();
+      loadDepartments();
+      loadSettings();
       await loadSavedSummary();
-      await loadDepartments();
     };
 
     checkAuthAndLoad();
@@ -196,7 +218,27 @@ export default function ManagePage() {
     return () => {
       cancelled = true;
     };
-  }, [router, sweepSuccess, refreshTrigger]);
+  }, [refreshTrigger]);
+
+  const handleThresholdChange = async (newDays: number) => {
+    setIdleThreshold(newDays);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`${API_BASE}/settings/idle-threshold`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idle_threshold_days: newDays }),
+      });
+      if (res.ok) {
+        setRefreshTrigger((prev) => prev + 1);
+      }
+    } catch (err) {
+      console.error('Error updating threshold:', err);
+    }
+  };
 
   // Step 1: Dry Run — call /api/scan to preview before opening Dialog
   const handleTriggerScan = async () => {
@@ -425,6 +467,8 @@ export default function ManagePage() {
                   onScanAndSweep={handleTriggerScan}
                   userRole={userRole}
                   onActionSuccess={() => setRefreshTrigger((prev) => prev + 1)}
+                  idleThreshold={idleThreshold}
+                  onChangeThreshold={handleThresholdChange}
                 />
               ) : (
                 <TerminatedHistoryTable />

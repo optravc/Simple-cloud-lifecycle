@@ -33,6 +33,9 @@ const (
 
 // SeedTrendData seeds the database tables with default historical UAT/Demo data if they do not exist
 func SeedTrendData(db *sql.DB) {
+	// 0. Initialize all database schemas first to prevent foreign key errors
+	InitCoreDatabaseSchema(db)
+
 	// 1. Check/Create scheduled_reports table and seed it
 	InitScheduledReports(db)
 
@@ -47,6 +50,92 @@ func SeedTrendData(db *sql.DB) {
 
 	// 5. Seed project costs for all 7 departments so Pie Chart shows complete 7-department breakdown
 	SeedAllDepartmentsProjectCosts(db)
+}
+
+// InitCoreDatabaseSchema creates all required PostgreSQL database tables in correct dependency order
+func InitCoreDatabaseSchema(db *sql.DB) {
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS departments (
+			id SERIAL PRIMARY KEY,
+			name VARCHAR(100) NOT NULL UNIQUE,
+			code VARCHAR(50),
+			description TEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS projects (
+			id VARCHAR(50) PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			department_id INTEGER REFERENCES departments(id),
+			owner VARCHAR(255),
+			provider VARCHAR(100),
+			allocation_model VARCHAR(50) DEFAULT 'Fixed',
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS cloud_resources (
+			id VARCHAR(100) PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			type VARCHAR(100) NOT NULL,
+			provider VARCHAR(50) NOT NULL,
+			project_tag VARCHAR(50),
+			cost_per_day NUMERIC(15, 2) NOT NULL DEFAULT 0,
+			status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+			idle_days INTEGER DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS daily_cloud_costs (
+			id SERIAL PRIMARY KEY,
+			record_date DATE NOT NULL UNIQUE,
+			total_cost NUMERIC(15, 2) NOT NULL DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS project_costs (
+			id SERIAL PRIMARY KEY,
+			project_id VARCHAR(50) REFERENCES projects(id),
+			record_month DATE NOT NULL,
+			spend NUMERIC(15, 2) NOT NULL DEFAULT 0,
+			mom_change NUMERIC(5, 2) DEFAULT 0,
+			is_tagged BOOLEAN DEFAULT true,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			CONSTRAINT unique_prj_month UNIQUE(project_id, record_month)
+		);`,
+		`CREATE TABLE IF NOT EXISTS allocation_usage (
+			id SERIAL PRIMARY KEY,
+			record_date DATE NOT NULL UNIQUE,
+			used_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS sweep_tracking (
+			id SERIAL PRIMARY KEY,
+			resource_id VARCHAR(100),
+			action_taken VARCHAR(50) NOT NULL,
+			saved_cost_per_day NUMERIC(15, 2) NOT NULL DEFAULT 0,
+			swept_date DATE NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+	}
+
+	for _, q := range queries {
+		if _, err := db.Exec(q); err != nil {
+			log.Printf("[Schema Init Warning] Error running query: %v\n", err)
+		}
+	}
+
+	// Seed default 7 departments
+	depts := []string{
+		"Core Infrastructure",
+		"Product Engineering",
+		"Data Science & Analytics",
+		"Trust & Safety",
+		"Finance",
+		"Executive / C-Level",
+		"FinOps & Cloud Governance",
+	}
+
+	for _, d := range depts {
+		_, _ = db.Exec(`INSERT INTO departments (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`, d)
+	}
+
+	log.Println("[Schema Init] Core database tables and 7 default departments initialized successfully.")
 }
 
 // InitScheduledReports creates and seeds scheduled_reports table
@@ -93,9 +182,33 @@ func InitScheduledReports(db *sql.DB) {
 	}
 }
 
-// SeedDynamicDashboardStats generates daily cost and allocation stats for the last 15 days dynamically
+// SeedDynamicDashboardStats generates daily cost, savings, and allocation stats for UAT / Demo
 func SeedDynamicDashboardStats(db *sql.DB) {
-	log.Println("[Dashboard Seed] Dynamic daily stats seeding is disabled for Production-ready state.")
+	// Seed daily_cloud_costs for last 14 days
+	_, _ = db.Exec(`
+		INSERT INTO daily_cloud_costs (record_date, total_cost)
+		SELECT dt::date, (3500.00 + (random() * 500.00))::numeric(15,2)
+		FROM generate_series(CURRENT_DATE - INTERVAL '14 days', CURRENT_DATE, '1 day'::interval) AS dt
+		ON CONFLICT (record_date) DO NOTHING;
+	`)
+
+	// Seed allocation_usage for last 14 days
+	_, _ = db.Exec(`
+		INSERT INTO allocation_usage (record_date, used_percentage)
+		SELECT dt::date, (82.5 + (random() * 10.0))::numeric(5,2)
+		FROM generate_series(CURRENT_DATE - INTERVAL '14 days', CURRENT_DATE, '1 day'::interval) AS dt
+		ON CONFLICT (record_date) DO NOTHING;
+	`)
+
+	// Seed sweep_tracking for last 14 days
+	_, _ = db.Exec(`
+		INSERT INTO sweep_tracking (resource_id, action_taken, saved_cost_per_day, swept_date)
+		SELECT 'i-auto-swept-' || dt::date, 'terminated', (850.00 + (random() * 200.00))::numeric(15,2), dt::date
+		FROM generate_series(CURRENT_DATE - INTERVAL '14 days', CURRENT_DATE, '1 day'::interval) AS dt
+		ON CONFLICT DO NOTHING;
+	`)
+
+	log.Println("[Dashboard Seed] Dynamic daily stats seeded successfully.")
 }
 
 // seedInvoices inserts basic invoice rows into cloud_invoices for all 7 multi-cloud providers

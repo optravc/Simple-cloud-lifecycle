@@ -37,7 +37,7 @@ resource "aws_launch_template" "app" {
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required" # IMDSv2 only
-    http_put_response_hop_limit = 1
+    http_put_response_hop_limit = 2
   }
 
   # User data — install Docker, clone repo, run docker-compose
@@ -207,6 +207,83 @@ resource "aws_iam_role_policy" "app_server_secrets" {
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
       Resource = aws_secretsmanager_secret.backend_secrets.arn
+    }]
+  })
+}
+
+# ECR — อ่านและดึง images จาก ECR
+resource "aws_iam_role_policy_attachment" "app_server_ecr" {
+  role       = aws_iam_role.app_server.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+# EC2 ReadOnly Access
+resource "aws_iam_role_policy_attachment" "app_server_ec2_readonly" {
+  role       = aws_iam_role.app_server.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+}
+
+# Billing ReadOnly Access
+resource "aws_iam_role_policy_attachment" "app_server_billing_readonly" {
+  role       = aws_iam_role.app_server.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSBillingReadOnlyAccess"
+}
+
+# CloudWatch ReadOnly Access
+resource "aws_iam_role_policy_attachment" "app_server_cloudwatch_readonly" {
+  role       = aws_iam_role.app_server.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
+}
+
+# Compute Optimizer ReadOnly Access
+resource "aws_iam_role_policy_attachment" "app_server_compute_optimizer_readonly" {
+  role       = aws_iam_role.app_server.name
+  policy_arn = "arn:aws:iam::aws:policy/ComputeOptimizerReadOnlyAccess"
+}
+
+# Cost Explorer & FinOps Policy
+resource "aws_iam_role_policy" "app_server_finops" {
+  name = "${local.name_prefix}-finops-policy"
+  role = aws_iam_role.app_server.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = [
+        "ce:*",
+        "aws-portal:ViewBilling",
+        "aws-portal:ViewUsage"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+# EC2 Lifecycle Management Policy (RunInstances, StopInstances, TerminateInstances, CreateTags)
+resource "aws_iam_role_policy" "app_server_ec2_manage" {
+  name = "${local.name_prefix}-ec2-manage-policy"
+  role = aws_iam_role.app_server.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "ec2:RunInstances",
+        "ec2:StopInstances",
+        "ec2:StartInstances",
+        "ec2:TerminateInstances",
+        "ec2:CreateTags",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeImages",
+        "ec2:DescribeKeyPairs"
+      ]
+      Resource = "*"
     }]
   })
 }

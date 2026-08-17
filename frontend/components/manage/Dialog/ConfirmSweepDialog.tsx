@@ -43,7 +43,12 @@ export default function ConfirmSweepDialog({ open,
       .filter((inst) => {
         const found = resources.find((r) => r.ID === inst.ID || r.Name === inst.Name);
         const status = found ? found.Status : inst.Status;
-        return status === 'ACTIVE';
+        const env = (found?.Environment || inst.Environment || '').toLowerCase();
+        const name = (found?.Name || inst.Name || '').toLowerCase();
+        const id = (found?.ID || inst.ID || '').toLowerCase();
+
+        const isProtected = env === 'permanent' || name.includes('app-server') || name.includes('scl-sandbox') || id === 'i-04ab766b1b53e5bab';
+        return status === 'ACTIVE' && !isProtected;
       });
   }, [previewData?.instances, resources]);
 
@@ -113,7 +118,7 @@ export default function ConfirmSweepDialog({ open,
         }}>
           <CheckCircleOutlineIcon sx={{ color: '#2ea043', fontSize: 36 }} />
           <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2ea043' }}>
-            No instances found Idle for more than 14 days
+            No instances found Idle for more than {previewData?.threshold_days ?? 14} days
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
             All instances in the system are within lifecycle limits — no action required
