@@ -90,8 +90,9 @@ resource "aws_autoscaling_group" "app" {
     aws_lb_target_group.frontend.arn
   ]
 
-  health_check_type         = "ELB"
-  health_check_grace_period = 300
+  # EC2 health check type prevents ASG from terminating instance while Docker builds
+  health_check_type         = "EC2"
+  health_check_grace_period = 2700 # 45 min
 
   # Instance refresh — rolling update เมื่อเปลี่ยน launch template
   instance_refresh {
@@ -128,32 +129,24 @@ resource "aws_autoscaling_group" "app" {
 
 resource "aws_security_group" "app_server" {
   name        = "${local.name_prefix}-sg-app-server"
+  # NOTE: description ห้ามแก้! จะทำให้ Terraform force-replace SG ทั้งตัว
   description = "Allow ALB traffic to app server (backend:8000 + frontend:3000)"
   vpc_id      = aws_vpc.main.id
 
-  # Backend API (port 8080) จาก ALB
+  # Frontend Web (port 3000) จาก ALB
+  ingress {
+    description     = "Frontend Web 3000 from ALB"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  # Backend API (port 8080) จาก ALB — docker-compose maps 8080(host)→8000(container)
   ingress {
     description     = "Backend API 8080 from ALB"
     from_port       = 8080
     to_port         = 8080
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  # Backend API (port 8000) จาก ALB
-  ingress {
-    description     = "Backend API 8000 from ALB"
-    from_port       = 8000
-    to_port         = 8000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  # Frontend (port 3000) จาก ALB
-  ingress {
-    description     = "Frontend from ALB"
-    from_port       = 3000
-    to_port         = 3000
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
