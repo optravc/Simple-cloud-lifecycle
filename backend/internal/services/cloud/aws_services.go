@@ -132,15 +132,10 @@ func calculateCostPerDay(instanceType string) float64 {
 // IsProtectedSystemResource checks if instance is critical core infrastructure that must never be stopped or swept
 func IsProtectedSystemResource(res models.CloudResource) bool {
 	nameLower := strings.ToLower(res.Name)
-	envLower := strings.ToLower(res.Environment)
 	idLower := strings.ToLower(res.ID)
-	ownerLower := strings.ToLower(res.Owner)
 
 	return strings.Contains(nameLower, "app-server") ||
 		strings.Contains(nameLower, "scl-sandbox") ||
-		strings.Contains(nameLower, "permanent") ||
-		strings.EqualFold(envLower, "permanent") ||
-		strings.EqualFold(ownerLower, "permanent") ||
 		idLower == "i-04ab766b1b53e5bab"
 }
 

@@ -47,7 +47,7 @@ export default function ConfirmSweepDialog({ open,
         const name = (found?.Name || inst.Name || '').toLowerCase();
         const id = (found?.ID || inst.ID || '').toLowerCase();
 
-        const isProtected = env === 'permanent' || name.includes('app-server') || name.includes('scl-sandbox') || id === 'i-04ab766b1b53e5bab';
+        const isProtected = name.includes('app-server') || name.includes('scl-sandbox') || id === 'i-04ab766b1b53e5bab';
         return status === 'ACTIVE' && !isProtected;
       });
   }, [previewData?.instances, resources]);
