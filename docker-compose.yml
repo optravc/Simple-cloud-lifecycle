@@ -5,6 +5,7 @@ services:
   # 1. ส่วนของ Backend (Go)
   # ==============================
   backend-api:
+    image: simple-cloud-lifecycle-backend:latest
     build: 
       context: ./backend    
       dockerfile: Dockerfile 
@@ -17,6 +18,7 @@ services:
   # 2. ส่วนของ Frontend (Next.js)
   # ==============================
   frontend-web:
+    image: simple-cloud-lifecycle-frontend:latest
     build:
       context: ./frontend   
       dockerfile: Dockerfile
