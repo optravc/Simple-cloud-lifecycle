@@ -134,6 +134,7 @@ func InitCoreDatabaseSchema(db *sql.DB) {
 		`ALTER TABLE sweep_tracking ADD COLUMN IF NOT EXISTS deadline_at TIMESTAMP;`,
 		`DELETE FROM sweep_tracking a USING sweep_tracking b WHERE a.id < b.id AND a.instance_id IS NOT NULL AND a.instance_id = b.instance_id;`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS sweep_tracking_instance_id_idx ON sweep_tracking (instance_id);`,
+		`DELETE FROM sweep_tracking WHERE instance_id IN ('i-081f749ca416173d4', 'i-0e0d9622c6def8658');`,
 	}
 	for _, mq := range migrationQueries {
 		if _, err := db.Exec(mq); err != nil {

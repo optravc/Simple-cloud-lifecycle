@@ -12,13 +12,16 @@ import { ConfirmSweepDialogProps, InstanceSweepSetting,CloudResource } from '@/t
 
 export default function ConfirmSweepDialog({ open, 
   onClose,
-   onConfirm, 
-   loading, 
-   previewData, 
-   resources 
-  }:Readonly<ConfirmSweepDialogProps>) {
+  onConfirm, 
+  loading, 
+  previewData, 
+  resources,
+  idleThreshold,
+}:Readonly<ConfirmSweepDialogProps>) {
   const [confirmText, setConfirmText] = useState('');
   const [rowSettings, setRowSettings] = useState<Record<string, InstanceSweepSetting>>({});
+
+  const effectiveThreshold = previewData?.threshold_days ?? idleThreshold ?? 14;
 
   // Normalize instances to always be full CloudResource objects
   const normalizedInstances = React.useMemo(() => {
@@ -47,7 +50,7 @@ export default function ConfirmSweepDialog({ open,
         const name = (found?.Name || inst.Name || '').toLowerCase();
         const id = (found?.ID || inst.ID || '').toLowerCase();
 
-        const isProtected = name.includes('app-server') || name.includes('scl-sandbox') || id === 'i-04ab766b1b53e5bab';
+        const isProtected = name.includes('app-server') || name.includes('scl-sandbox');
         return status === 'ACTIVE' && !isProtected;
       });
   }, [previewData?.instances, resources]);
@@ -118,7 +121,7 @@ export default function ConfirmSweepDialog({ open,
         }}>
           <CheckCircleOutlineIcon sx={{ color: '#2ea043', fontSize: 36 }} />
           <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2ea043' }}>
-            No instances found Idle for more than {previewData?.threshold_days ?? 14} days
+            No instances found Idle for more than {effectiveThreshold === 0 ? '0 days (Instant Demo Mode)' : `${effectiveThreshold} ${effectiveThreshold === 1 ? 'day' : 'days'}`}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
             All instances in the system are within lifecycle limits — no action required

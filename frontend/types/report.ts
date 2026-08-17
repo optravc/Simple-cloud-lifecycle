@@ -26,9 +26,11 @@ export interface ScheduledReport {
 }
 
 export interface ReportsResponse {
+  status?: string;
   cost_trend: ReportTrendItem[];
   scheduled_reports: ScheduledReport[];
   roi_summary: RoiSummary;
+  npv_analysis?: unknown[];
 }
 export interface TrendDataItem {
   month: string;

@@ -1,0 +1,11 @@
+# Terraform local files
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# Temporary / Output files
+ssm_out.txt
+ssm_params.json
+.infracost/

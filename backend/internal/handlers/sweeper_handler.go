@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -27,7 +28,10 @@ func calculatePotentialSavings(ctx context.Context, db *sql.DB) float64 {
 	var potentialSavingsDaily float64
 	threshold := ops.GetEffectiveThreshold(db)
 	for _, res := range resources {
-		if res.DayIdle >= threshold && res.Status == "ACTIVE" {
+		if cloud.IsProtectedSystemResource(res) || strings.EqualFold(res.Environment, "permanent") {
+			continue
+		}
+		if res.DayIdle >= threshold && (res.Status == "ACTIVE" || res.Status == "PENDING_SWEEP") {
 			potentialSavingsDaily += res.CostPerDay
 		}
 	}
@@ -122,11 +126,18 @@ func ScanDryRunHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		threshold := ops.GetEffectiveThreshold(db)
+		if thresholdStr := r.URL.Query().Get("threshold"); thresholdStr != "" {
+			if t, err := strconv.Atoi(thresholdStr); err == nil && t >= 0 {
+				threshold = t
+			}
+		}
+
 		// ดึงข้อมูลทรัพยากรทั้งหมดจาก AWS
 		resources := ops.GetAllResources(r.Context(), db)
 
 		// Dry Run: แค่นับและรายงาน ไม่ flag ไม่ส่ง email
-		idleResources := ops.DryRunScan(resources, db)
+		idleResources := ops.DryRunScanWithThreshold(resources, threshold)
 		count := len(idleResources)
 		
 		var totalSavings float64
@@ -139,7 +150,7 @@ func ScanDryRunHandler(db *sql.DB) http.HandlerFunc {
 			"items_to_sweep":    count,
 			"potential_savings": totalSavings,
 			"instances":         idleResources,
-			"threshold_days":    ops.GetEffectiveThreshold(db),
+			"threshold_days":    threshold,
 		}
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -217,7 +228,9 @@ func GetSavedSummaryHandler(db *sql.DB) http.HandlerFunc {
 
 		response := map[string]interface{}{
 			"swept_count":             sweptCount,
+			"actual_savings":          actualSavingsDaily,
 			"actual_savings_daily":    actualSavingsDaily,
+			"potential_savings":       potentialSavingsDaily,
 			"potential_savings_daily": potentialSavingsDaily,
 		}
 

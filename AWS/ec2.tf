@@ -267,24 +267,42 @@ resource "aws_iam_role_policy" "app_server_ec2_manage" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "ec2:RunInstances",
-        "ec2:StopInstances",
-        "ec2:StartInstances",
-        "ec2:TerminateInstances",
-        "ec2:CreateTags",
-        "ec2:DescribeInstances",
-        "ec2:DescribeInstanceStatus",
-        "ec2:DescribeSecurityGroups",
-        "ec2:DescribeSubnets",
-        "ec2:DescribeVpcs",
-        "ec2:DescribeImages",
-        "ec2:DescribeKeyPairs"
-      ]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        # Describe actions จำเป็นต้องใช้ Resource = "*" ตามข้อจำกัดของ AWS API
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceStatus",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeImages",
+          "ec2:DescribeKeyPairs"
+        ]
+        Resource = "*"
+      },
+      {
+        # Action ที่จัดการ Instance / Volume จำกัดขอบเขตให้ชัดเจนขึ้น
+        Effect = "Allow"
+        Action = [
+          "ec2:RunInstances",
+          "ec2:StopInstances",
+          "ec2:StartInstances",
+          "ec2:TerminateInstances",
+          "ec2:CreateTags"
+        ]
+        Resource = [
+          "arn:aws:ec2:${var.aws_region}:*:instance/*",
+          "arn:aws:ec2:${var.aws_region}:*:subnet/*",
+          "arn:aws:ec2:${var.aws_region}:*:security-group/*",
+          "arn:aws:ec2:${var.aws_region}:*:volume/*",
+          "arn:aws:ec2:${var.aws_region}:*:network-interface/*",
+          "arn:aws:ec2:${var.aws_region}:*:image/*",
+          "arn:aws:ec2:${var.aws_region}:*:key-pair/*"
+        ]
+      }
+    ]
   })
 }
 

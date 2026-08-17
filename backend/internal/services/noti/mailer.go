@@ -41,25 +41,14 @@ type LeaseNotificationInput struct {
 	IsGracePeriod bool
 }
 
-// SendSweepNotificationEmail ส่งอีเมลแจ้งเตือนผ่าน AWS SES (รองรับข้อมูล FinOps และ Resource Details ครบถ้วน)
+/// SendSweepNotificationEmail ส่งอีเมลแจ้งเตือนผ่าน AWS SES (รองรับข้อมูล FinOps และ Resource Details ครบถ้วน)
 func SendSweepNotificationEmail(input EmailNotificationInput) {
 	ctx := context.TODO()
 
-	region := input.Region
-	if region == "" {
-		region = os.Getenv("AWS_REGION")
-		if region == "" {
-			region = "ap-southeast-1"
-		}
-	}
-
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
-	if err != nil {
-		log.Printf("[Error] Unable to load AWS SDK config: %v\n", err)
+	client, region := initSESClient(input.Region)
+	if client == nil {
 		return
 	}
-
-	client := ses.NewFromConfig(cfg)
 
 	senderEmail := os.Getenv("SES_SENDER_EMAIL")
 	if senderEmail == "" {
@@ -67,6 +56,55 @@ func SendSweepNotificationEmail(input EmailNotificationInput) {
 		return
 	}
 
+	recipientEmail := resolveRecipientEmail(input.OwnerEmail, senderEmail)
+	subject, body := buildEmailContent(input, region)
+
+	sesInput := &ses.SendEmailInput{
+		Destination: &types.Destination{
+			ToAddresses: []string{recipientEmail},
+		},
+		Message: &types.Message{
+			Subject: &types.Content{Data: aws.String(subject)},
+			Body: &types.Body{Html: &types.Content{Data: aws.String(body)}},
+		},
+		Source: aws.String(senderEmail),
+	}
+
+	sendEmailWithRetry(ctx, client, sesInput, recipientEmail, senderEmail)
+}
+
+// 1. แยกส่วน Initialize AWS SES Client
+func initSESClient(inputRegion string) (*ses.Client, string) {
+	region := inputRegion
+	if region == "" {
+		region = os.Getenv("AWS_REGION")
+		if region == "" {
+			region = "ap-southeast-1"
+		}
+	}
+
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	if err != nil {
+		log.Printf("[Error] Unable to load AWS SDK config: %v\n", err)
+		return nil, ""
+	}
+
+	return ses.NewFromConfig(cfg), region
+}
+
+// 2. แยกส่วนกำหนด Email ผู้รับ (Fallback Logic)
+func resolveRecipientEmail(ownerEmail, senderEmail string) string {
+	if ownerEmail == "" || strings.Contains(ownerEmail, "noreply") || strings.Contains(ownerEmail, "unknown") {
+		if fallback := os.Getenv("FALLBACK_ADMIN_EMAIL"); fallback != "" {
+			return fallback
+		}
+		return senderEmail
+	}
+	return ownerEmail
+}
+
+// 3. แยกส่วนสร้างเนื้อหา Subject และ HTML Body
+func buildEmailContent(input EmailNotificationInput, region string) (string, string) {
 	baseURL := strings.TrimSpace(os.Getenv("API_BASE_URL"))
 	if baseURL == "" || strings.Contains(baseURL, "localhost") {
 		baseURL = "http://scl-sandbox-alb-2027317152.ap-southeast-1.elb.amazonaws.com"
@@ -74,10 +112,10 @@ func SendSweepNotificationEmail(input EmailNotificationInput) {
 
 	confirmLink := fmt.Sprintf("%s/api/resolve?id=%s&action=confirm", baseURL, input.InstanceID)
 	cancelLink := fmt.Sprintf("%s/api/resolve?id=%s&action=cancel", baseURL, input.InstanceID)
-
 	monthlyCost := input.CostPerDay * 30.0
+
 	subject := fmt.Sprintf("[Cloud Lifecycle] Action Required: Idle Resource %s Scheduled for Deletion", input.InstanceName)
-	
+
 	body := fmt.Sprintf(`<!DOCTYPE html>
 	<html>
 	<head>
@@ -133,54 +171,32 @@ func SendSweepNotificationEmail(input EmailNotificationInput) {
 		input.OwnerTeam, input.InstanceName, input.InstanceID, region, input.Environment, input.IdleDays, input.CostPerDay, monthlyCost, input.Deadline, confirmLink, cancelLink,
 	)
 
-	recipientEmail := input.OwnerEmail
-	if recipientEmail == "" || strings.Contains(recipientEmail, "noreply") || strings.Contains(recipientEmail, "unknown") {
-		fallback := os.Getenv("FALLBACK_ADMIN_EMAIL")
-		if fallback != "" {
-			recipientEmail = fallback
-		} else {
-			recipientEmail = senderEmail
-		}
-	}
+	return subject, body
+}
 
-	sesInput := &ses.SendEmailInput{
-		Destination: &types.Destination{
-			ToAddresses: []string{recipientEmail},
-		},
-		Message: &types.Message{
-			Subject: &types.Content{
-				Data: aws.String(subject),
-			},
-			Body: &types.Body{
-				Html: &types.Content{
-					Data: aws.String(body),
-				},
-			},
-		},
-		Source: aws.String(senderEmail),
-	}
-
-	_, err = client.SendEmail(ctx, sesInput)
-	if err != nil {
-		log.Printf("Failed to send email via AWS SES to %s: %v\n", recipientEmail, err)
-		fallback := os.Getenv("FALLBACK_ADMIN_EMAIL")
-		if fallback == "" {
-			fallback = senderEmail
-		}
-		if fallback != "" && recipientEmail != fallback {
-			log.Printf("Retrying AWS SES email to verified fallback admin email: %s\n", fallback)
-			sesInput.Destination.ToAddresses = []string{fallback}
-			_, retryErr := client.SendEmail(ctx, sesInput)
-			if retryErr != nil {
-				log.Printf("Failed to send email via AWS SES to fallback %s: %v\n", fallback, retryErr)
-			} else {
-				log.Printf("AWS SES email sent successfully to fallback %s\n", fallback)
-			}
-		}
+// 4. แยกส่วนการส่งอีเมลและการทำ Retry กรณีเกิด Error
+func sendEmailWithRetry(ctx context.Context, client *ses.Client, sesInput *ses.SendEmailInput, recipientEmail, senderEmail string) {
+	_, err := client.SendEmail(ctx, sesInput)
+	if err == nil {
+		log.Printf("AWS SES email sent successfully to %s\n", recipientEmail)
 		return
 	}
 
-	log.Printf("AWS SES email sent successfully to %s\n", recipientEmail)
+	log.Printf("Failed to send email via AWS SES to %s: %v\n", recipientEmail, err)
+	fallback := os.Getenv("FALLBACK_ADMIN_EMAIL")
+	if fallback == "" {
+		fallback = senderEmail
+	}
+
+	if fallback != "" && recipientEmail != fallback {
+		log.Printf("Retrying AWS SES email to verified fallback admin email: %s\n", fallback)
+		sesInput.Destination.ToAddresses = []string{fallback}
+		if _, retryErr := client.SendEmail(ctx, sesInput); retryErr != nil {
+			log.Printf("Failed to send email via AWS SES to fallback %s: %v\n", fallback, retryErr)
+		} else {
+			log.Printf("AWS SES email sent successfully to fallback %s\n", fallback)
+		}
+	}
 }
 
 // SendLeaseExpiryNotificationEmail ส่งอีเมลแจ้งเตือนเมื่อสัญญาเช่าใกล้หมดอายุ หรือเมื่อระบบสั่งหยุดทำงาน

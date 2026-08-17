@@ -110,7 +110,8 @@ func processTerminatedLeases(ctx context.Context, db *sql.DB) {
 
 		// 2.1 สั่งลบเครื่องบน AWS
 		if errTerm := cloud.TerminateEC2Instances(ctx, []string{instID}); errTerm != nil {
-			log.Printf("[Lease Cron Error] Failed to terminate instance %s: %v\n", instID, errTerm)
+			log.Printf("[Lease Cron Error] Failed to terminate instance %s on AWS: %v. Skipping DB status update.\n", instID, errTerm)
+			continue
 		}
 
 		// 2.2 ดึงข้อมูลราคาต่อวันจาก cloud_resources เพื่อนำไปสะสมข้อมูลประหยัดค่าใช้จ่ายจริง

@@ -13,8 +13,10 @@ const PROVIDER_COLORS: Record<string, string> = {
   'azure': '#0089D6',
   'salesforce': '#00A1E0',
   'ibm': '#1F70C1',
+  'ibm cloud': '#1F70C1',
   'oracle': '#F80000',
   'alibaba': '#FF6A00',
+  'alibaba cloud': '#FF6A00',
   'core infrastructure': '#2065D1',
   'product engineering': '#826af9',
   'data science & analytics': '#FFAB00',
@@ -28,7 +30,7 @@ const getProviderColor = (name: string, index: number = 0): string => {
   const p = (name || '').toLowerCase().trim();
   if (PROVIDER_COLORS[p]) return PROVIDER_COLORS[p];
   for (const key of Object.keys(PROVIDER_COLORS)) {
-    if (p.includes(key)) return PROVIDER_COLORS[key];
+    if (key.length > 2 && p.includes(key)) return PROVIDER_COLORS[key];
   }
   return COLOR_PALETTE[index % COLOR_PALETTE.length];
 };
@@ -99,6 +101,14 @@ export default function CostBreakdownCard({
 
   const totalSpend = providerData.reduce((acc, curr) => acc + curr.value, 0);
 
+  const isDeptData = providerData.some(d => {
+    const lname = d.name.toLowerCase();
+    return lname.includes('infrastructure') || lname.includes('engineering') || lname.includes('analytics') || lname.includes('safety') || lname.includes('governance');
+  });
+
+  const cardTitle = isDeptData ? 'Department Cost Allocation' : 'Cloud Provider Cost Share';
+  const cardSubtitle = isDeptData ? 'Expenditure breakdown by business department' : 'Multi-cloud vendor expenditure breakdown';
+
   return (
     <Card 
       elevation={0} 
@@ -117,10 +127,10 @@ export default function CostBreakdownCard({
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2, gap: 2 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#212b36', fontSize: '1rem', mb: 0.5 }}>
-              Cloud Provider Cost Share
+              {cardTitle}
             </Typography>
             <Typography variant="body2" sx={{ color: '#637381', fontSize: '0.82rem', lineHeight: 1.3 }}>
-              Multi-cloud vendor expenditure breakdown
+              {cardSubtitle}
             </Typography>
           </Box>
 
@@ -135,6 +145,10 @@ export default function CostBreakdownCard({
               <MenuItem value="AWS">AWS</MenuItem>
               <MenuItem value="GCP">GCP</MenuItem>
               <MenuItem value="Azure">Azure</MenuItem>
+              <MenuItem value="Salesforce">Salesforce</MenuItem>
+              <MenuItem value="IBM Cloud">IBM Cloud</MenuItem>
+              <MenuItem value="Oracle">Oracle</MenuItem>
+              <MenuItem value="Alibaba Cloud">Alibaba Cloud</MenuItem>
             </Select>
           </FormControl>
         </Box>

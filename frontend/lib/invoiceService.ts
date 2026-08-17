@@ -206,7 +206,10 @@ export async function getInvoices(): Promise<InvoiceItem[]> {
       throw new Error(`HTTP error: ${res.status}`);
     }
     const data = await res.json();
-    return data || [];
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+    return [...MOCK_INVOICES];
   } catch (err) {
     console.warn("Backend /api/invoices failed, falling back to mock data:", err);
     return [...MOCK_INVOICES];

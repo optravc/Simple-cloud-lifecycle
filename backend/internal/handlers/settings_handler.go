@@ -43,8 +43,8 @@ func UpdateThresholdHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if req.IdleThresholdDays <= 0 || req.IdleThresholdDays > 365 {
-			writeHTTPError(w, "idle_threshold_days must be between 1 and 365 days", http.StatusBadRequest)
+		if req.IdleThresholdDays < 0 || req.IdleThresholdDays > 365 {
+			writeHTTPError(w, "idle_threshold_days must be between 0 and 365 days", http.StatusBadRequest)
 			return
 		}
 

@@ -90,11 +90,7 @@ func calculateIdleDays(launchTime *time.Time, awsState string) int {
 	if launchTime == nil || (awsState != "running" && awsState != "stopped") {
 		return 0
 	}
-	dayIdle := int(time.Since(*launchTime).Hours() / 24.0)
-	if dayIdle == 0 {
-		return 1
-	}
-	return dayIdle
+	return int(time.Since(*launchTime).Hours() / 24.0)
 }
 
 // determineResourceStatus determines simple status mapping of ec2 states
@@ -133,13 +129,20 @@ func calculateCostPerDay(instanceType string) float64 {
 }
 
 // IsProtectedSystemResource checks if instance is critical core infrastructure that must never be stopped or swept
+
+const (
+	KeywordAppServer  = "app-server"
+	KeywordSclSandbox = "scl-sandbox"
+)
+
 func IsProtectedSystemResource(res models.CloudResource) bool {
 	nameLower := strings.ToLower(res.Name)
 	idLower := strings.ToLower(res.ID)
+	appID := strings.ToLower(os.Getenv("PRIMARY_APP_INSTANCE_ID"))
 
-	return strings.Contains(nameLower, "app-server") ||
-		strings.Contains(nameLower, "scl-sandbox") ||
-		idLower == "i-04ab766b1b53e5bab"
+	return strings.Contains(nameLower, KeywordAppServer) ||
+		strings.Contains(nameLower, KeywordSclSandbox) ||
+		(appID != "" && idLower == appID)
 }
 
 // mapEC2InstanceToResource maps a single EC2 Instance type to Models.CloudResource
@@ -151,16 +154,15 @@ func mapEC2InstanceToResource(instance ec2types.Instance, teamDetails map[string
 	ownerEmail, departmentName := lookupOwnerAndDept(ownerTag, teamDetails)
 	
 	// Mark primary application server instance as Permanent Core Infrastructure
-	if id == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(name), "app-server") || strings.Contains(strings.ToLower(name), "scl-sandbox") {
-		environment = "Permanent"
-		ownerTag = "Infra Team"
-		ownerEmail = "noptrapk+infra.lead@gmail.com"
-		departmentName = "Core Infrastructure"
-		if description == "" {
-			description = "Primary Cloud Lifecycle Application & Backend API Server"
-		}
-	}
-
+	if strings.Contains(strings.ToLower(name), KeywordAppServer) || strings.Contains(strings.ToLower(name), KeywordSclSandbox) {
+    environment = "Permanent"
+    ownerTag = "Infra Team"
+    ownerEmail = "noptrapk+infra.lead@gmail.com"
+    departmentName = "Core Infrastructure"
+    if description == "" {
+        description = "Primary Cloud Lifecycle Application & Backend API Server"
+    }
+}
 	dayIdle := calculateIdleDays(instance.LaunchTime, awsState)
 	status := determineResourceStatus(awsState)
 	if status == "TERMINATED" {
@@ -299,8 +301,8 @@ func (p *AWSProvider) processEC2Instances(
 	for _, reservation := range output.Reservations {
 		for _, instance := range reservation.Instances {
 			if r, ok := p.processSingleEC2Instance(instance, teamDetails, restricted, allowedTeams, userDept); ok {
-				// ซ่อนเครื่อง App Server หลัก (scl-sandbox-app-server) ไม่ให้แสดงในตาราง Manage ป้องกันคนกดลบ
-				if r.ID == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(r.Name), "app-server") || strings.Contains(strings.ToLower(r.Name), "scl-sandbox") {
+				// ซ่อนเครื่อง App Server หลัก ไม่ให้แสดงในตาราง Manage ป้องกันคนกดลบ
+				if IsProtectedSystemResource(r) {
 					log.Printf("[AWS Security] Hiding primary app server instance %s (%s) from Manage table\n", r.ID, r.Name)
 					continue
 				}
@@ -345,9 +347,8 @@ func (p *AWSProvider) fetchFallbackResourcesFromDB(restricted bool, allowedTeams
 		FROM sweep_tracking st
 		LEFT JOIN teams t ON LOWER(t.contact_email) = LOWER(st.owner_email)
 		LEFT JOIN departments d ON t.department_id = d.id
-		WHERE st.status != 'TERMINATED' AND st.status != 'ARCHIVED'
-		  AND st.instance_id != 'i-04ab766b1b53e5bab'
-		  AND LOWER(st.instance_name) NOT LIKE '%app-server%'
+		WHERE LOWER(st.instance_name) NOT LIKE '%app-server%' AND LOWER(st.instance_name) NOT LIKE '%scl-sandbox%'
+		ORDER BY st.id DESC LIMIT 20
 	`)
 	if err != nil {
 		return nil
@@ -482,7 +483,7 @@ func retainEBSVolume(ctx context.Context, client *ec2.Client, instanceID string)
 
 // SweepEC2Instances terminate instance พร้อมรองรับ Create AMI และ Retain EBS ตาม settings
 func SweepEC2Instances(ctx context.Context, instanceID string, settings SweepSettings) error {
-	if instanceID == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(instanceID), "app-server") {
+	if IsProtectedSystemResource(models.CloudResource{ID: instanceID, Name: instanceID}) {
 		return fmt.Errorf("action blocked: instance %s is critical core system infrastructure and cannot be swept", instanceID)
 	}
 
@@ -518,7 +519,7 @@ func SweepEC2Instances(ctx context.Context, instanceID string, settings SweepSet
 func TerminateEC2Instances(ctx context.Context, instanceIDs []string) error {
 	var allowedIDs []string
 	for _, id := range instanceIDs {
-		if id == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(id), "app-server") {
+		if IsProtectedSystemResource(models.CloudResource{ID: id, Name: id}) {
 			log.Printf("[FinOps Protection] Blocked termination of core system instance: %s\n", id)
 			continue
 		}
@@ -571,7 +572,7 @@ func StartEC2Instance(ctx context.Context, instanceID string) error {
 
 // StopEC2Instance สั่งปิดเครื่อง EC2 — returns actual AWS error to caller
 func StopEC2Instance(ctx context.Context, instanceID string) error {
-	if instanceID == "i-04ab766b1b53e5bab" || strings.Contains(strings.ToLower(instanceID), "app-server") {
+	if IsProtectedSystemResource(models.CloudResource{ID: instanceID, Name: instanceID}) {
 		return fmt.Errorf("action blocked: instance %s is critical core system infrastructure and cannot be stopped", instanceID)
 	}
 

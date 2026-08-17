@@ -42,7 +42,7 @@ func InitSystemSettings(db *sql.DB) {
 // GetEffectiveThreshold คืนค่า threshold จริงที่จะใช้ โดยดึงจาก DB หรือ Env Override
 func GetEffectiveThreshold(db *sql.DB) int {
 	if override := os.Getenv("SWEEP_IDLE_OVERRIDE"); override != "" {
-		if val, err := strconv.Atoi(override); err == nil && val > 0 {
+		if val, err := strconv.Atoi(override); err == nil && val >= 0 {
 			log.Printf("[Warning] SWEEP_IDLE_OVERRIDE is set to %d days (testing mode)", val)
 			return val
 		}
@@ -52,7 +52,7 @@ func GetEffectiveThreshold(db *sql.DB) int {
 		var valStr string
 		err := db.QueryRow("SELECT value FROM system_settings WHERE key = 'idle_threshold_days'").Scan(&valStr)
 		if err == nil && valStr != "" {
-			if val, err := strconv.Atoi(valStr); err == nil && val > 0 {
+			if val, err := strconv.Atoi(valStr); err == nil && val >= 0 {
 				return val
 			}
 		}
@@ -108,6 +108,10 @@ func StartSweeperCron(db *sql.DB) {
 // ใช้สำหรับแสดง Preview ให้ผู้ใช้เห็นก่อนยืนยัน Sweep
 func DryRunScan(resources []models.CloudResource, db *sql.DB) []models.CloudResource {
 	threshold := GetEffectiveThreshold(db)
+	return DryRunScanWithThreshold(resources, threshold)
+}
+
+func DryRunScanWithThreshold(resources []models.CloudResource, threshold int) []models.CloudResource {
 	var idleResources []models.CloudResource
 
 	for _, res := range resources {

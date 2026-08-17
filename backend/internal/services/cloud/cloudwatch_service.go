@@ -1,13 +1,13 @@
 package cloud
 
 import (
+	"automated-lifecycle/backend/internal/models"
 	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"math"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -90,9 +90,7 @@ func getRunningInstances(ctx context.Context, client *ec2.Client) ([]tempInstanc
 				}
 			}
 
-			// Exclude core application server (scl-sandbox-app-server / i-04ab766b1b53e5bab) from performance metrics
-			nameLower := strings.ToLower(name)
-			if instanceID == "i-04ab766b1b53e5bab" || strings.Contains(nameLower, "app-server") || strings.Contains(nameLower, "scl-sandbox") {
+			if IsProtectedSystemResource(models.CloudResource{ID: instanceID, Name: name}) {
 				continue
 			}
 
@@ -303,21 +301,21 @@ func GetPerformanceData(ctx context.Context, db *sql.DB) (*PerformanceData, erro
 	}
 
 	trendOutput, err := cwClient.GetMetricStatistics(ctx, trendInput)
+	var trend []TrendPoint
 	if err != nil {
-		log.Printf("Failed to get trend metrics: %v", err)
-		return nil, fmt.Errorf("failed to get trend metrics: %w", err)
-	}
-
-	sort.Slice(trendOutput.Datapoints, func(i, j int) bool {
-		if trendOutput.Datapoints[i].Timestamp == nil || trendOutput.Datapoints[j].Timestamp == nil {
-			return false
-		}
-		return trendOutput.Datapoints[i].Timestamp.Before(*trendOutput.Datapoints[j].Timestamp)
-	})
-
-	trend := buildTrendPoints(trendOutput.Datapoints)
-	if len(trend) == 0 {
+		log.Printf("[CloudWatch Warning] Failed to get trend metrics: %v. Using fallback trend.", err)
 		trend = generateFallbackTrend(avgCpu, avgMemory)
+	} else {
+		sort.Slice(trendOutput.Datapoints, func(i, j int) bool {
+			if trendOutput.Datapoints[i].Timestamp == nil || trendOutput.Datapoints[j].Timestamp == nil {
+				return false
+			}
+			return trendOutput.Datapoints[i].Timestamp.Before(*trendOutput.Datapoints[j].Timestamp)
+		})
+		trend = buildTrendPoints(trendOutput.Datapoints)
+		if len(trend) == 0 {
+			trend = generateFallbackTrend(avgCpu, avgMemory)
+		}
 	}
 
 	return &PerformanceData{

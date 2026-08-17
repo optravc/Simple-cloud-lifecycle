@@ -35,7 +35,7 @@ Centralized Cloud Financial Management (FinOps) dashboard for monitoring, analyz
 
 ##  Cloud Architecture
 
-![Cloud Architecture Diagram](docs/images/architecture_diagram.png)
+![Cloud Architecture Diagram](docs/images/cloud_arch.png)
 
 ```text
 Internet Users

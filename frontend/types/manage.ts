@@ -56,7 +56,8 @@ export interface ConfirmSweepDialogProps {
   }[]) => void;
   loading: boolean;
   previewData: PreviewData | null;
-  resources: CloudResource[]; 
+  resources: CloudResource[];
+  idleThreshold?: number;
 }
 
 export interface DeptItem {

@@ -136,9 +136,9 @@ export default function ManagePage() {
         if (res.ok) {
           const data = await res.json();
           if (cancelled) return;
-          setActualSavings(data.actual_savings || 0);
-          setSweptCount(data.swept_count || 0);
-          setPotentialSavings(data.potential_savings || 0);
+          setActualSavings(data.actual_savings_daily ?? data.actual_savings ?? 0);
+          setSweptCount(data.swept_count ?? 0);
+          setPotentialSavings(data.potential_savings_daily ?? data.potential_savings ?? 0);
         }
       } catch (err) {
         console.error('Error fetching saved summary:', err);
@@ -212,7 +212,7 @@ export default function ManagePage() {
     setScanning(true);
     setError(null);
     try {
-      const res = await fetchWithAuth(`${API_BASE}/scan`, {
+      const res = await fetchWithAuth(`${API_BASE}/scan?threshold=${idleThreshold}`, {
         method: 'POST',
       });
 
@@ -224,6 +224,7 @@ export default function ManagePage() {
         items_to_sweep: data.items_to_sweep,
         potential_savings: data.potential_savings,
         instances: data.instances ?? [],
+        threshold_days: data.threshold_days ?? idleThreshold,
       });
       setIsConfirmOpen(true);
     } catch (err) {
@@ -455,6 +456,7 @@ export default function ManagePage() {
         loading={loading}
         previewData={previewData}
         resources={resources}
+        idleThreshold={idleThreshold}
       />
 
       {/* Launch Server Modal */}

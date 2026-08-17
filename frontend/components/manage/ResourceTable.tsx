@@ -118,6 +118,7 @@ export default function ResourceTable({
                   onChange={(e) => onChangeThreshold && onChangeThreshold(Number(e.target.value))}
                   sx={{ borderRadius: 2, fontSize: '0.825rem', fontWeight: 700 }}
                 >
+                  <MenuItem value={0}>0 Days (Instant Demo Mode)</MenuItem>
                   <MenuItem value={1}>1 Day (Testing Mode)</MenuItem>
                   <MenuItem value={3}>3 Days</MenuItem>
                   <MenuItem value={7}>7 Days</MenuItem>

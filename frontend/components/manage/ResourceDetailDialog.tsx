@@ -53,8 +53,7 @@ export default function ResourceDetailDialog({
 
   const isProtected = (resource.Environment || '').toLowerCase() === 'permanent' ||
     (resource.Name || '').toLowerCase().includes('app-server') ||
-    (resource.Name || '').toLowerCase().includes('scl-sandbox') ||
-    resource.ID === 'i-04ab766b1b53e5bab';
+    (resource.Name || '').toLowerCase().includes('scl-sandbox');
 
   const currentStatus = statusOverride || resource.Status || 'ACTIVE';
 
