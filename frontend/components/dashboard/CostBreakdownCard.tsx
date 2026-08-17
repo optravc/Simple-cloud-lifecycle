@@ -1,19 +1,36 @@
-import  { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, Typography, Box, FormControl, Select, MenuItem } from '@mui/material';
-import { PieChart, Pie, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { CostBreakdownCardProps, PieData, ChargeItem } from '@/types/dashboard';
 import { API_BASE } from '@/lib/api';
 
-const getProviderColor = (name: string): string => {
-  const p = (name || '').toLowerCase().replace(/\s+/g, '');
-  if (p.includes('aws')) return '#FF9900';
-  if (p.includes('gcp') || p.includes('google')) return '#4285F4';
-  if (p.includes('azure')) return '#0089D6';
-  if (p.includes('salesforce')) return '#00A1E0';
-  if (p.includes('ibm')) return '#1F70C1';
-  if (p.includes('oracle')) return '#F80000';
-  if (p.includes('alibaba')) return '#FF6A00';
-  return '#1890FF';
+const COLOR_PALETTE = ['#2065D1', '#826af9', '#FFAB00', '#2ea043', '#d32f2f', '#00bcd4', '#9c27b0', '#FF9900', '#4285F4'];
+
+const PROVIDER_COLORS: Record<string, string> = {
+  'aws': '#FF9900',
+  'gcp': '#4285F4',
+  'google': '#4285F4',
+  'azure': '#0089D6',
+  'salesforce': '#00A1E0',
+  'ibm': '#1F70C1',
+  'oracle': '#F80000',
+  'alibaba': '#FF6A00',
+  'core infrastructure': '#2065D1',
+  'product engineering': '#826af9',
+  'data science & analytics': '#FFAB00',
+  'trust & safety': '#2ea043',
+  'finance': '#d32f2f',
+  'executive / c-level': '#00bcd4',
+  'finops & cloud governance': '#9c27b0',
+};
+
+const getProviderColor = (name: string, index: number = 0): string => {
+  const p = (name || '').toLowerCase().trim();
+  if (PROVIDER_COLORS[p]) return PROVIDER_COLORS[p];
+  for (const key of Object.keys(PROVIDER_COLORS)) {
+    if (p.includes(key)) return PROVIDER_COLORS[key];
+  }
+  return COLOR_PALETTE[index % COLOR_PALETTE.length];
 };
 
 const DEFAULT_PROVIDER_DATA: PieData[] = [
@@ -75,9 +92,9 @@ export default function CostBreakdownCard({
     rawProviderData = dynamicData;
   }
 
-  const providerData = rawProviderData.map((item) => ({
+  const providerData = rawProviderData.map((item, idx) => ({
     ...item,
-    fill: getProviderColor(item.name),
+    fill: getProviderColor(item.name, idx),
   }));
 
   const totalSpend = providerData.reduce((acc, curr) => acc + curr.value, 0);
@@ -125,7 +142,7 @@ export default function CostBreakdownCard({
         {/* Legend pills */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1, mt: 1 }}>
           {providerData.map((item) => {
-            const pct = Math.round((item.value / totalSpend) * 100);
+            const pct = totalSpend > 0 ? Math.round((item.value / totalSpend) * 100) : 0;
             return (
               <Box key={item.name} sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                 <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: item.fill }} />
@@ -149,7 +166,11 @@ export default function CostBreakdownCard({
                 outerRadius={95} 
                 paddingAngle={3}   
                 dataKey="value"
-              />
+              >
+                {providerData.map((item) => (
+                  <Cell key={`cell-${item.name}`} fill={item.fill} />
+                ))}
+              </Pie>
               <Tooltip 
                 formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Spend']}
                 contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 8px 16px rgba(0,0,0,0.1)' }}

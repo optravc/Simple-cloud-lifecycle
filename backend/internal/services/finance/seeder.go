@@ -106,10 +106,15 @@ func InitCoreDatabaseSchema(db *sql.DB) {
 		);`,
 		`CREATE TABLE IF NOT EXISTS sweep_tracking (
 			id SERIAL PRIMARY KEY,
+			instance_id VARCHAR(100),
+			instance_name VARCHAR(255),
+			owner_email VARCHAR(255),
+			status VARCHAR(50),
+			deadline_at TIMESTAMP,
 			resource_id VARCHAR(100),
-			action_taken VARCHAR(50) NOT NULL,
+			action_taken VARCHAR(50),
 			saved_cost_per_day NUMERIC(15, 2) NOT NULL DEFAULT 0,
-			swept_date DATE NOT NULL,
+			swept_date DATE,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
 	}
@@ -117,6 +122,22 @@ func InitCoreDatabaseSchema(db *sql.DB) {
 	for _, q := range queries {
 		if _, err := db.Exec(q); err != nil {
 			log.Printf("[Schema Init Warning] Error running query: %v\n", err)
+		}
+	}
+
+	// Schema Migrations for sweep_tracking
+	migrationQueries := []string{
+		`ALTER TABLE sweep_tracking ADD COLUMN IF NOT EXISTS instance_id VARCHAR(100);`,
+		`ALTER TABLE sweep_tracking ADD COLUMN IF NOT EXISTS instance_name VARCHAR(255);`,
+		`ALTER TABLE sweep_tracking ADD COLUMN IF NOT EXISTS owner_email VARCHAR(255);`,
+		`ALTER TABLE sweep_tracking ADD COLUMN IF NOT EXISTS status VARCHAR(50);`,
+		`ALTER TABLE sweep_tracking ADD COLUMN IF NOT EXISTS deadline_at TIMESTAMP;`,
+		`DELETE FROM sweep_tracking a USING sweep_tracking b WHERE a.id < b.id AND a.instance_id IS NOT NULL AND a.instance_id = b.instance_id;`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS sweep_tracking_instance_id_idx ON sweep_tracking (instance_id);`,
+	}
+	for _, mq := range migrationQueries {
+		if _, err := db.Exec(mq); err != nil {
+			log.Printf("[Migration Warning] %v\n", err)
 		}
 	}
 

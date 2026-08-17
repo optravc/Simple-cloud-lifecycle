@@ -77,7 +77,10 @@ func lookupOwnerAndDept(ownerTag string, teamDetails map[string]teamDetail) (str
 
 	fallback := os.Getenv("FALLBACK_ADMIN_EMAIL")
 	if fallback == "" {
-		fallback = "noreply@internal.system"
+		fallback = os.Getenv("SES_SENDER_EMAIL")
+		if fallback == "" {
+			fallback = "noreply@internal.system"
+		}
 	}
 	return fallback, "Unknown"
 }
@@ -324,7 +327,7 @@ func (p *AWSProvider) processSingleEC2Instance(
 
 	var deadline sql.NullTime
 	var trackingStatus sql.NullString
-	_ = p.DB.QueryRow("SELECT deadline_at, status FROM sweep_tracking WHERE instance_id = $1", r.ID).Scan(&deadline, &trackingStatus)
+	_ = p.DB.QueryRow("SELECT deadline_at, status FROM sweep_tracking WHERE instance_id = $1 ORDER BY id DESC LIMIT 1", r.ID).Scan(&deadline, &trackingStatus)
 	if trackingStatus.Valid && trackingStatus.String == "PENDING_SWEEP" {
 		r.Status = "PENDING_SWEEP"
 	}

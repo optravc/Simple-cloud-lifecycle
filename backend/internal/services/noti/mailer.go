@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -66,9 +67,9 @@ func SendSweepNotificationEmail(input EmailNotificationInput) {
 		return
 	}
 
-	baseURL := os.Getenv("API_BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:8000"
+	baseURL := strings.TrimSpace(os.Getenv("API_BASE_URL"))
+	if baseURL == "" || strings.Contains(baseURL, "localhost") {
+		baseURL = "http://scl-sandbox-alb-2027317152.ap-southeast-1.elb.amazonaws.com"
 	}
 
 	confirmLink := fmt.Sprintf("%s/api/resolve?id=%s&action=confirm", baseURL, input.InstanceID)
@@ -132,9 +133,19 @@ func SendSweepNotificationEmail(input EmailNotificationInput) {
 		input.OwnerTeam, input.InstanceName, input.InstanceID, region, input.Environment, input.IdleDays, input.CostPerDay, monthlyCost, input.Deadline, confirmLink, cancelLink,
 	)
 
+	recipientEmail := input.OwnerEmail
+	if recipientEmail == "" || strings.Contains(recipientEmail, "noreply") || strings.Contains(recipientEmail, "unknown") {
+		fallback := os.Getenv("FALLBACK_ADMIN_EMAIL")
+		if fallback != "" {
+			recipientEmail = fallback
+		} else {
+			recipientEmail = senderEmail
+		}
+	}
+
 	sesInput := &ses.SendEmailInput{
 		Destination: &types.Destination{
-			ToAddresses: []string{input.OwnerEmail},
+			ToAddresses: []string{recipientEmail},
 		},
 		Message: &types.Message{
 			Subject: &types.Content{
@@ -151,11 +162,25 @@ func SendSweepNotificationEmail(input EmailNotificationInput) {
 
 	_, err = client.SendEmail(ctx, sesInput)
 	if err != nil {
-		log.Printf("Failed to send email via AWS SES to %s: %v\n", input.OwnerEmail, err)
+		log.Printf("Failed to send email via AWS SES to %s: %v\n", recipientEmail, err)
+		fallback := os.Getenv("FALLBACK_ADMIN_EMAIL")
+		if fallback == "" {
+			fallback = senderEmail
+		}
+		if fallback != "" && recipientEmail != fallback {
+			log.Printf("Retrying AWS SES email to verified fallback admin email: %s\n", fallback)
+			sesInput.Destination.ToAddresses = []string{fallback}
+			_, retryErr := client.SendEmail(ctx, sesInput)
+			if retryErr != nil {
+				log.Printf("Failed to send email via AWS SES to fallback %s: %v\n", fallback, retryErr)
+			} else {
+				log.Printf("AWS SES email sent successfully to fallback %s\n", fallback)
+			}
+		}
 		return
 	}
 
-	log.Printf("AWS SES email sent successfully to %s\n", input.OwnerEmail)
+	log.Printf("AWS SES email sent successfully to %s\n", recipientEmail)
 }
 
 // SendLeaseExpiryNotificationEmail ส่งอีเมลแจ้งเตือนเมื่อสัญญาเช่าใกล้หมดอายุ หรือเมื่อระบบสั่งหยุดทำงาน
@@ -184,9 +209,9 @@ func SendLeaseExpiryNotificationEmail(input LeaseNotificationInput) {
 		return
 	}
 
-	baseURL := os.Getenv("API_BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:8000"
+	baseURL := strings.TrimSpace(os.Getenv("API_BASE_URL"))
+	if baseURL == "" || strings.Contains(baseURL, "localhost") {
+		baseURL = "http://scl-sandbox-alb-2027317152.ap-southeast-1.elb.amazonaws.com"
 	}
 
 	extendLink := fmt.Sprintf("%s/api/resolve-lease?id=%s&action=extend", baseURL, input.InstanceID)

@@ -80,11 +80,21 @@ func createLeaseTracking(db *sql.DB, leaseDays int, instanceID, name, ownerEmail
 		return nil
 	}
 	deadline := time.Now().AddDate(0, 0, leaseDays)
-	_, err := db.Exec(`
-		INSERT INTO sweep_tracking (instance_id, instance_name, owner_email, status, deadline_at)
-		VALUES ($1, $2, $3, 'LEASED', $4)
-		ON CONFLICT (instance_id) DO UPDATE SET status = 'LEASED', deadline_at = $4
-	`, instanceID, name, ownerEmail, deadline)
+	resExec, err := db.Exec(`
+		UPDATE sweep_tracking 
+		SET status = 'LEASED', deadline_at = $1, instance_name = $2, owner_email = $3 
+		WHERE instance_id = $4
+	`, deadline, name, ownerEmail, instanceID)
+
+	if err == nil {
+		rowsAffected, _ := resExec.RowsAffected()
+		if rowsAffected == 0 {
+			_, err = db.Exec(`
+				INSERT INTO sweep_tracking (instance_id, instance_name, owner_email, status, deadline_at)
+				VALUES ($1, $2, $3, 'LEASED', $4)
+			`, instanceID, name, ownerEmail, deadline)
+		}
+	}
 	return err
 }
 
@@ -285,13 +295,22 @@ func ExtendLeaseHandler(db *sql.DB) http.HandlerFunc {
 		// คำนวณวันเดดไลน์ใหม่
 		newDeadline := time.Now().AddDate(0, 0, req.Days)
 
-		// อัปเดตตาราง tracking
-		_, err := db.Exec(`
-			INSERT INTO sweep_tracking (instance_id, instance_name, owner_email, status, deadline_at)
-			VALUES ($1, $2, $3, 'LEASED', $4)
-			ON CONFLICT (instance_id) 
-			DO UPDATE SET status = 'LEASED', deadline_at = $4
-		`, req.InstanceID, targetResource.Name, targetResource.OwnerEmail, newDeadline)
+		// อัปเดตตาราง tracking (Update-else-Insert)
+		resExec, err := db.Exec(`
+			UPDATE sweep_tracking 
+			SET status = 'LEASED', deadline_at = $1, instance_name = $2, owner_email = $3 
+			WHERE instance_id = $4
+		`, newDeadline, targetResource.Name, targetResource.OwnerEmail, req.InstanceID)
+
+		if err == nil {
+			rowsAffected, _ := resExec.RowsAffected()
+			if rowsAffected == 0 {
+				_, err = db.Exec(`
+					INSERT INTO sweep_tracking (instance_id, instance_name, owner_email, status, deadline_at)
+					VALUES ($1, $2, $3, 'LEASED', $4)
+				`, req.InstanceID, targetResource.Name, targetResource.OwnerEmail, newDeadline)
+			}
+		}
 
 		if err != nil {
 			writeHTTPError(w, "failed to update lease deadline: "+err.Error(), http.StatusInternalServerError)

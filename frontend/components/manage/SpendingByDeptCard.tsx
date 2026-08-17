@@ -7,7 +7,7 @@ import {
   SelectChangeEvent
 } from '@mui/material';
 import {
-  PieChart, Pie, ResponsiveContainer, Tooltip
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip
 } from 'recharts';
 import { SpendingByDeptCardProps } from '@/types/manage';
 
@@ -244,7 +244,11 @@ const getTeamSpendingTitle = (team: string) => {
                     outerRadius={85}
                     paddingAngle={3}
                     dataKey="value"
-                  />
+                  >
+                    {pieData.map((item, index) => (
+                      <Cell key={`cell-${item.name}-${index}`} fill={item.fill} />
+                    ))}
+                  </Pie>
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>

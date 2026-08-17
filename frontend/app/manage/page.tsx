@@ -17,6 +17,7 @@ import ConfirmSweepDialog from '@/components/manage/Dialog/ConfirmSweepDialog';
 import LaunchServerDialog from '@/components/manage/Dialog/LaunchServerDialog';
 import CreateTeamDialog from '@/components/manage/Dialog/CreateTeamDialog';
 import { API_BASE } from '@/lib/api';
+import { fetchWithAuth } from '@/lib/fetchWithAuth';
 
 const IDLE_THRESHOLD_DAYS = 14;
 const drawerWidth = 260;
@@ -71,18 +72,8 @@ export default function ManagePage() {
 
     const loadResources = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch(`${API_BASE}/resources`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
+        const res = await fetchWithAuth(`${API_BASE}/resources`);
         if (!res.ok) {
-          if (res.status === 401) {
-            throw new Error('Session expired or not logged in (401)');
-          }
           throw new Error(`HTTP error: ${res.status}`);
         }
 
@@ -101,13 +92,7 @@ export default function ManagePage() {
 
     const loadTeams = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch(`${API_BASE}/teams`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        const res = await fetchWithAuth(`${API_BASE}/teams`);
         if (res.ok) {
           const data: TeamItem[] = await res.json();
           if (cancelled) return;
@@ -120,13 +105,7 @@ export default function ManagePage() {
 
     const loadDepartments = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch(`${API_BASE}/departments`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        const res = await fetchWithAuth(`${API_BASE}/departments`);
         if (res.ok) {
           const data: DeptItem[] = await res.json();
           if (cancelled) return;
@@ -153,19 +132,13 @@ export default function ManagePage() {
 
     const loadSavedSummary = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch(`${API_BASE}/resources/saved-summary`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        const res = await fetchWithAuth(`${API_BASE}/resources/saved-summary`);
         if (res.ok) {
           const data = await res.json();
           if (cancelled) return;
-          setActualSavings(Number(data.actual_savings_daily ?? 0));
-          setSweptCount(Number(data.swept_count ?? 0));
-          setPotentialSavings(Number(data.potential_savings_daily ?? 0));
+          setActualSavings(data.actual_savings || 0);
+          setSweptCount(data.swept_count || 0);
+          setPotentialSavings(data.potential_savings || 0);
         }
       } catch (err) {
         console.error('Error fetching saved summary:', err);
@@ -174,13 +147,7 @@ export default function ManagePage() {
 
     const loadSettings = async () => {
       try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch(`${API_BASE}/settings`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        const res = await fetchWithAuth(`${API_BASE}/settings`);
         if (res.ok) {
           const data = await res.json();
           if (!cancelled && data.idle_threshold_days) {
@@ -245,13 +212,8 @@ export default function ManagePage() {
     setScanning(true);
     setError(null);
     try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(`${API_BASE}/scan`, {
+      const res = await fetchWithAuth(`${API_BASE}/scan`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
       });
 
       if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
@@ -282,13 +244,8 @@ export default function ManagePage() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(`${API_BASE}/sweep`, {
+      const res = await fetchWithAuth(`${API_BASE}/sweep`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ selections }),
       });
 

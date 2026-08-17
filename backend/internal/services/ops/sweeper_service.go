@@ -155,16 +155,25 @@ func SweepSelectedInstances(ctx context.Context, db *sql.DB, selections []SweepS
 
 		deadline := time.Now().AddDate(0, 0, 7) // Grace period 7 วัน
 
-		// บันทึกลงตาราง Tracking (upsert)
-		query := `
-			INSERT INTO sweep_tracking (instance_id, instance_name, owner_email, status, deadline_at)
-			VALUES ($1, $2, $3, 'PENDING_SWEEP', $4)
-			ON CONFLICT (instance_id) DO UPDATE SET status = 'PENDING_SWEEP', deadline_at = $4
-		`
-		_, err := db.Exec(query, res.ID, res.Name, res.OwnerEmail, deadline)
+		// บันทึกลงตาราง Tracking (Update-else-Insert ป้องกัน error 42P10 กรณี constraint หาย)
+		resExec, err := db.Exec(`
+			UPDATE sweep_tracking 
+			SET status = 'PENDING_SWEEP', deadline_at = $1, instance_name = $2, owner_email = $3
+			WHERE instance_id = $4
+		`, deadline, res.Name, res.OwnerEmail, res.ID)
+
+		if err == nil {
+			rowsAffected, _ := resExec.RowsAffected()
+			if rowsAffected == 0 {
+				_, err = db.Exec(`
+					INSERT INTO sweep_tracking (instance_id, instance_name, owner_email, status, deadline_at)
+					VALUES ($1, $2, $3, 'PENDING_SWEEP', $4)
+				`, res.ID, res.Name, res.OwnerEmail, deadline)
+			}
+		}
+
 		if err != nil {
-			log.Printf("Error inserting tracking for %s: %v\n", res.ID, err)
-			continue
+			log.Printf("[Sweep Error] Error updating/inserting tracking for %s: %v\n", res.ID, err)
 		}
 
 		// Log settings ที่ผู้ใช้เลือก

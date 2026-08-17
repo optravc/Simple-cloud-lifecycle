@@ -5,8 +5,11 @@ services:
   # 1. ส่วนของ Backend (Go)
   # ==============================
   backend-api:
+    build: ./backend
     image: 439855819034.dkr.ecr.ap-southeast-1.amazonaws.com/scl-sandbox-backend:latest
     container_name: lifecycle_backend
+    environment:
+      - API_BASE_URL=http://scl-sandbox-alb-2027317152.ap-southeast-1.elb.amazonaws.com
     env_file:
       - ./backend/.env
     ports:
@@ -17,6 +20,7 @@ services:
   # 2. ส่วนของ Frontend (Next.js)
   # ==============================
   frontend-web:
+    build: ./frontend
     image: 439855819034.dkr.ecr.ap-southeast-1.amazonaws.com/scl-sandbox-frontend:latest
     container_name: lifecycle_frontend
     ports:

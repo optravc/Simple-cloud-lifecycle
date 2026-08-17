@@ -1,6 +1,8 @@
 import { fetchWithAuth } from './fetchWithAuth';
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+export const API_BASE = typeof window !== 'undefined'
+  ? (process.env.NEXT_PUBLIC_API_URL || '/api')
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://backend:8080/api');
 export const S3_BASE_URL = 'https://simeple-cloud-lifecylce-demo-storage.s3.ap-southeast-7.amazonaws.com/';
 
 // Fetch cloud resources data

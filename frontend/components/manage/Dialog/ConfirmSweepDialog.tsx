@@ -110,7 +110,7 @@ export default function ConfirmSweepDialog({ open,
     : 0;
 
   const renderSweepContent = () => {
-    if (previewData?.items_to_sweep === 0) {
+    if (!normalizedInstances || normalizedInstances.length === 0) {
       return (
         <Box sx={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5,
