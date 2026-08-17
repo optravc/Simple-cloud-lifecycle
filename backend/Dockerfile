@@ -5,7 +5,12 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app-api ./cmd/api/main.go
+# ── Memory control for low-RAM environments (t3.micro) ────────
+ARG GOGC=100
+ARG GOMAXPROCS=2
+RUN GOGC=${GOGC} GOMAXPROCS=${GOMAXPROCS} \
+    CGO_ENABLED=0 GOOS=linux \
+    go build -ldflags="-w -s" -o /app-api ./cmd/api/main.go
 
 
 FROM alpine:3.20
