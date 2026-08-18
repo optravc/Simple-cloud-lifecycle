@@ -104,8 +104,8 @@ func determineResourceStatus(awsState string) string {
 	return "ACTIVE"
 }
 
-// calculateCostPerDay calculates Singapore On-Demand daily costs for standard EC2 instances
-func calculateCostPerDay(instanceType string) float64 {
+// CalculateCostPerDay calculates Singapore On-Demand daily costs for standard EC2 instances
+func CalculateCostPerDay(instanceType string) float64 {
 	switch instanceType {
 	case "t3.nano":
 		return 0.0052 * 24.0
@@ -168,7 +168,7 @@ func mapEC2InstanceToResource(instance ec2types.Instance, teamDetails map[string
 	if status == "TERMINATED" {
 		dayIdle = 0
 	}
-	costPerDay := calculateCostPerDay(string(instance.InstanceType))
+	costPerDay := CalculateCostPerDay(string(instance.InstanceType))
 
 	return models.CloudResource{
 		ID:          id,

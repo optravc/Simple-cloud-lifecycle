@@ -46,9 +46,20 @@ func handleSweepConfirmation(ctx context.Context, db *sql.DB, instanceID string)
 	
 	queryResource := "SELECT name, cost_per_day, project_tag FROM cloud_resources WHERE id = $1"
 	err := db.QueryRow(queryResource, instanceID).Scan(&resourceName, &costPerDay, &projectID)
-	if err != nil {
-		costPerDay = 15.50
-		log.Printf("[Resolve] Warning: instance %s not found in cloud_resources: %v\n", instanceID, err)
+	if err != nil || costPerDay <= 0 {
+		// Dynamically fetch resource details from live AWS EC2 scanning
+		allRes := ops.GetAllResources(ctx, db)
+		for _, r := range allRes {
+			if r.ID == instanceID {
+				costPerDay = r.CostPerDay
+				resourceName = r.Name
+				break
+			}
+		}
+		if costPerDay <= 0 {
+			costPerDay = 0.25
+		}
+		log.Printf("[Resolve] Dynamic cost lookup for instance %s: %s ($%.2f/day)\n", instanceID, resourceName, costPerDay)
 	}
 
 	err = cloud.TerminateEC2Instances(ctx, []string{instanceID})
