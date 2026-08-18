@@ -82,7 +82,7 @@ func createLeaseTracking(db *sql.DB, leaseDays int, instanceID, name, ownerEmail
 	deadline := time.Now().AddDate(0, 0, leaseDays)
 	resExec, err := db.Exec(`
 		UPDATE sweep_tracking 
-		SET status = 'LEASED', deadline_at = $1, instance_name = $2, owner_email = $3 
+		SET status = 'LEASED', action_taken = 'active', saved_cost_per_day = 0, deadline_at = $1, instance_name = $2, owner_email = $3 
 		WHERE instance_id = $4
 	`, deadline, name, ownerEmail, instanceID)
 
@@ -90,8 +90,8 @@ func createLeaseTracking(db *sql.DB, leaseDays int, instanceID, name, ownerEmail
 		rowsAffected, _ := resExec.RowsAffected()
 		if rowsAffected == 0 {
 			_, err = db.Exec(`
-				INSERT INTO sweep_tracking (instance_id, instance_name, owner_email, status, deadline_at)
-				VALUES ($1, $2, $3, 'LEASED', $4)
+				INSERT INTO sweep_tracking (instance_id, instance_name, owner_email, status, action_taken, saved_cost_per_day, deadline_at)
+				VALUES ($1, $2, $3, 'LEASED', 'active', 0, $4)
 			`, instanceID, name, ownerEmail, deadline)
 		}
 	}

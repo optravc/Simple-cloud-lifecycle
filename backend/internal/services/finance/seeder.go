@@ -138,6 +138,7 @@ func InitCoreDatabaseSchema(db *sql.DB) {
 		`DELETE FROM teams a USING teams b WHERE a.id > b.id AND LOWER(a.team_name) = LOWER(b.team_name);`,
 		`DELETE FROM teams WHERE LOWER(team_name) IN ('marketingteam', 'rd-department', 'team-alpha', 'team-b');`,
 		`UPDATE sweep_tracking SET saved_cost_per_day = 0.25 WHERE saved_cost_per_day = 15.50;`,
+		`UPDATE sweep_tracking SET action_taken = 'active' WHERE status IN ('ACTIVE', 'STOPPED', 'PENDING_SWEEP', 'LEASED') OR saved_cost_per_day = 0;`,
 	}
 	for _, mq := range migrationQueries {
 		if _, err := db.Exec(mq); err != nil {

@@ -288,7 +288,7 @@ func ResolveSweepHandler(db *sql.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 		if action == "cancel" {
-			if _, err := db.Exec("UPDATE sweep_tracking SET status = 'ACTIVE', deadline_at = NULL WHERE instance_id = $1", instanceID); err != nil {
+			if _, err := db.Exec("UPDATE sweep_tracking SET status = 'ACTIVE', action_taken = 'cancelled', saved_cost_per_day = 0, deadline_at = NULL WHERE instance_id = $1", instanceID); err != nil {
 				log.Printf("[Sweeper] DB error cancelling sweep for instance %s: %v\n", instanceID, err)
 			}
 			_, _ = w.Write([]byte(fmt.Sprintf("<h2>Cancellation Successful</h2><p>The system has cancelled the sweep for instance %s.</p>", instanceID)))
@@ -350,7 +350,9 @@ func GetTerminatedHistoryHandler(db *sql.DB) http.HandlerFunc {
 				FROM sweep_tracking st
 				JOIN teams t ON LOWER(t.contact_email) = LOWER(st.owner_email)
 				JOIN departments d ON t.department_id = d.id
-				WHERE (st.action_taken = 'terminated' OR st.status = 'TERMINATED' OR st.status = 'ARCHIVED')
+				WHERE st.action_taken = 'terminated'
+				  AND st.saved_cost_per_day > 0
+				  AND st.status NOT IN ('ACTIVE', 'PENDING_SWEEP', 'STOPPED', 'LEASED')
 				  AND LOWER(d.name) = LOWER($1)
 				ORDER BY st.deadline_at DESC
 			`, userDept)
@@ -360,7 +362,9 @@ func GetTerminatedHistoryHandler(db *sql.DB) http.HandlerFunc {
 				       COALESCE(saved_cost_per_day, 0), COALESCE(action_taken, 'terminated'),
 				       deadline_at
 				FROM sweep_tracking
-				WHERE action_taken = 'terminated' OR status = 'TERMINATED' OR status = 'ARCHIVED'
+				WHERE action_taken = 'terminated'
+				  AND saved_cost_per_day > 0
+				  AND status NOT IN ('ACTIVE', 'PENDING_SWEEP', 'STOPPED', 'LEASED')
 				ORDER BY deadline_at DESC
 			`)
 		}

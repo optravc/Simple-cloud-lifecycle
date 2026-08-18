@@ -64,6 +64,21 @@ export default function ManagePage() {
   );
   const activeCount = runningResources.length;
 
+  // Dynamically calculate potential savings based on selected idleThreshold dropdown
+  const calculatedPotentialSavings = useEffect !== undefined ? (
+    activeResources.reduce((acc, res) => {
+      const name = (res.Name || '').toLowerCase();
+      const env = (res.Environment || '').toLowerCase();
+      if (env === 'permanent' || name.includes('app-server') || name.includes('scl-sandbox')) {
+        return acc;
+      }
+      if (res.DayIdle >= idleThreshold) {
+        return acc + (res.Costperday || 0.25);
+      }
+      return acc;
+    }, 0)
+  ) : potentialSavings;
+
 
 
 
@@ -404,7 +419,7 @@ export default function ManagePage() {
 
           <ManageKpiCards
             activeCount={activeCount}
-            potentialSavings={potentialSavings}
+            potentialSavings={calculatedPotentialSavings}
             actualSavings={actualSavings}
             sweptCount={sweptCount}
           />
