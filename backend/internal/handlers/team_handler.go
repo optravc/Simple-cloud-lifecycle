@@ -28,7 +28,7 @@ func GetTeamsHandler(db *sql.DB) http.HandlerFunc {
 			strings.Contains(strings.ToLower(userDept), "finops") ||
 			strings.Contains(strings.ToLower(userDept), "finance") {
 			rows, err = db.Query(`
-				SELECT t.team_name, t.contact_email, d.name 
+				SELECT DISTINCT t.team_name, t.contact_email, d.name 
 				FROM teams t
 				JOIN departments d ON t.department_id = d.id
 				ORDER BY t.team_name ASC
@@ -36,7 +36,7 @@ func GetTeamsHandler(db *sql.DB) http.HandlerFunc {
 		} else {
 			// ถ้าเป็น Lead หรือ Dev ให้ดึงเฉพาะทีมในแผนกตนเอง
 			rows, err = db.Query(`
-				SELECT t.team_name, t.contact_email, d.name 
+				SELECT DISTINCT t.team_name, t.contact_email, d.name 
 				FROM teams t
 				JOIN departments d ON t.department_id = d.id
 				WHERE LOWER(d.name) = LOWER($1)

@@ -139,7 +139,7 @@ export default function LaunchServerDialog({
                   }
                 }}
               >
-                {teams.map((t) => (
+                {Array.from(new Map(teams.map((t) => [t.team_name, t])).values()).map((t) => (
                   <MenuItem key={t.team_name} value={t.team_name}>
                     {t.team_name}
                   </MenuItem>
