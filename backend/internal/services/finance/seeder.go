@@ -136,6 +136,7 @@ func InitCoreDatabaseSchema(db *sql.DB) {
 		`CREATE UNIQUE INDEX IF NOT EXISTS sweep_tracking_instance_id_idx ON sweep_tracking (instance_id);`,
 		`DELETE FROM sweep_tracking WHERE instance_id IN ('i-081f749ca416173d4', 'i-0e0d9622c6def8658');`,
 		`DELETE FROM teams a USING teams b WHERE a.id > b.id AND LOWER(a.team_name) = LOWER(b.team_name);`,
+		`DELETE FROM teams WHERE LOWER(team_name) IN ('marketingteam', 'rd-department', 'team-alpha', 'team-b');`,
 	}
 	for _, mq := range migrationQueries {
 		if _, err := db.Exec(mq); err != nil {
