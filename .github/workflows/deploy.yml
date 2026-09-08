@@ -143,7 +143,7 @@ jobs:
             --instance-ids $INSTANCE_IDS \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy ${{ github.sha }} from GitHub Actions" \
-            --parameters 'commands=["cd /opt/app/repo && git pull origin main && bash AWS/deploy_ec2.sh 2>&1"]' \
+            --parameters 'commands=["cd /opt/app/repo && git fetch origin && git reset --hard origin/main && bash AWS/deploy_ec2.sh 2>&1"]' \
             --region ${{ env.AWS_REGION }} \
             --query "Command.CommandId" \
             --output text)
