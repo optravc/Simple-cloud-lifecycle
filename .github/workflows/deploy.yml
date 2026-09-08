@@ -1,4 +1,4 @@
-﻿name: CI/CD — Test, Build, Push ECR & Deploy to EC2
+name: CI/CD — Test, Build, Push ECR & Deploy to EC2
 
 on:
   push:
@@ -123,6 +123,7 @@ jobs:
 
       - name: Deploy to ALL instances in Auto Scaling Group
         run: |
+          # ดึง instance IDs จาก ASG tag
           INSTANCE_IDS=$(aws ec2 describe-instances \
             --filters \
               "Name=tag:${{ env.ASG_TAG_KEY }},Values=${{ env.ASG_TAG_VALUE }}" \
@@ -130,13 +131,19 @@ jobs:
             --query "Reservations[*].Instances[*].InstanceId" \
             --output text | tr '\t\n' ',' | sed 's/,$//')
 
+          # Fallback: ถ้า ASG tag หาไม่เจอ ใช้ instance เดิม
+          if [ -z "$INSTANCE_IDS" ]; then
+            echo "ASG tag not found, falling back to known instance ID"
+            INSTANCE_IDS="i-042a4bc873688c582"
+          fi
+
           echo "Deploying to instances: $INSTANCE_IDS"
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids $INSTANCE_IDS \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy ${{ github.sha }} from GitHub Actions" \
-            --parameters 'commands=["cd /opt/app/repo && git pull origin main && bash AWS/deploy_ec2.sh"]' \
+            --parameters 'commands=["cd /opt/app/repo && git pull origin main && bash AWS/deploy_ec2.sh 2>&1"]' \
             --region ${{ env.AWS_REGION }} \
             --query "Command.CommandId" \
             --output text)
@@ -147,7 +154,15 @@ jobs:
       - name: Wait for SSM command to complete
         run: |
           echo "Waiting for deploy to finish..."
-          sleep 30
+          sleep 45
+
+          # ดู output จริงจาก instance
+          aws ssm list-command-invocations \
+            --command-id $COMMAND_ID \
+            --region ${{ env.AWS_REGION }} \
+            --details \
+            --query "CommandInvocations[*].{Status:Status,Output:CommandPlugins[0].Output}" \
+            --output table || true
 
           STATUS=$(aws ssm list-command-invocations \
             --command-id $COMMAND_ID \
@@ -161,7 +176,7 @@ jobs:
             echo "Deploy FAILED on one or more instances!"
             exit 1
           fi
-          echo "Deploy command completed successfully"
+          echo "Deploy completed successfully"
 
 # JOB 4: Health Check หลัง deploy
   health-check:
