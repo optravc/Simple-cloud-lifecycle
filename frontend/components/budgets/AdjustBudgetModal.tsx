@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Typography, Box, Grid,
@@ -16,6 +16,8 @@ interface AdjustBudgetModalProps {
   onDeptSelectChange: (id: number) => void;
   newBudgetAmount: string;
   onBudgetAmountChange: (val: string) => void;
+  alertAtPercent: string;
+  onAlertAtPercentChange: (val: string) => void;
   onSave: () => void;
   isSubmitting: boolean;
 }
@@ -28,6 +30,8 @@ export default function AdjustBudgetModal({
   onDeptSelectChange,
   newBudgetAmount,
   onBudgetAmountChange,
+  alertAtPercent,
+  onAlertAtPercentChange,
   onSave,
   isSubmitting,
 }: Readonly<AdjustBudgetModalProps>) {
@@ -61,7 +65,7 @@ export default function AdjustBudgetModal({
 
       <DialogContent sx={{ pt: 3, pb: 2 }}>
         <Typography variant="body2" sx={{ mb: 2.5, color: '#64748b', fontSize: '0.85rem' }}>
-          Select a cost center department and adjust its monthly cloud budget (USD). FinOps alert thresholds and Slack channels will update automatically.
+          Select a cost center department and adjust its monthly cloud budget (USD) and FinOps alert threshold. Slack channels will update automatically.
         </Typography>
 
         <Grid container spacing={2.5}>
@@ -92,9 +96,9 @@ export default function AdjustBudgetModal({
           </Grid>
 
           {/* 2. Monthly Budget Amount */}
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 12, sm: 7 }}>
             <Typography sx={{ fontWeight: '600', fontSize: '0.85rem', color: '#2d3748', mb: 1 }}>
-              Monthly Budget Amount (USD) <span style={{ color: '#dc3545' }}>*</span>
+              Monthly Budget (USD) <span style={{ color: '#dc3545' }}>*</span>
             </Typography>
             <TextField
               fullWidth
@@ -108,6 +112,34 @@ export default function AdjustBudgetModal({
                   startAdornment: <InputAdornment position="start">$</InputAdornment>,
                 },
               }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  bgcolor: '#fff',
+                },
+              }}
+            />
+          </Grid>
+
+          {/* 3. Warning Alert Threshold */}
+          <Grid size={{ xs: 12, sm: 5 }}>
+            <Typography sx={{ fontWeight: '600', fontSize: '0.85rem', color: '#2d3748', mb: 1 }}>
+              Warning Alert At
+            </Typography>
+            <TextField
+              fullWidth
+              type="number"
+              value={alertAtPercent}
+              onChange={(e) => onAlertAtPercentChange(e.target.value)}
+              placeholder="80"
+              disabled={selectedDeptId === '' || isSubmitting}
+              slotProps={{
+                input: {
+                  endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                  inputProps: { min: 1, max: 99, step: 1 },
+                },
+              }}
+              helperText="Triggers Warning status (1-99%)"
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 2,

@@ -24,7 +24,8 @@ export interface DepartmentBudget {
   spent: number;
   forecasted: number;
   owner: string;
-  status: string; 
+  alertAt: number;    // per-department warning threshold (%)
+  status: string;
   slack: string;
   email: string;
   projects: ProjectBudget[];

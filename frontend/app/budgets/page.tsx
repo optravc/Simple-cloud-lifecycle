@@ -16,7 +16,7 @@ import AdjustBudgetModal from '@/components/budgets/AdjustBudgetModal';
 import ActionStatusModal from '@/components/common/ActionStatusModal';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import { getBudgets, updateBudget } from '@/lib/api';
+import { getBudgets, updateBudget, updateAlertThreshold } from '@/lib/api';
 import { getUserInfo } from '@/lib/auth';
 import { UserRole } from '@/types/auth';
 import { BudgetsData } from '@/types/budget';
@@ -37,6 +37,7 @@ export default function BudgetsPage() {
   const [openModal, setOpenModal] = useState<boolean>(false);
   const [selectedDeptId, setSelectedDeptId] = useState<number | ''>('');
   const [newBudgetAmount, setNewBudgetAmount] = useState<string>('');
+  const [alertAtPercent, setAlertAtPercent] = useState<string>('80');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const [page, setPage] = useState<number>(0);
@@ -92,10 +93,12 @@ export default function BudgetsPage() {
       if (dept) {
         setSelectedDeptId(deptId);
         setNewBudgetAmount(dept.allocated.toString());
+        setAlertAtPercent((dept.alertAt ?? 80).toString());
       }
     } else {
       setSelectedDeptId('');
       setNewBudgetAmount('');
+      setAlertAtPercent('80');
     }
     setOpenModal(true);
   };
@@ -106,6 +109,7 @@ export default function BudgetsPage() {
     const dept = data.departments.find(d => d.id === id);
     if (dept) {
       setNewBudgetAmount(dept.allocated.toString());
+      setAlertAtPercent((dept.alertAt ?? 80).toString());
     }
   };
 
@@ -134,16 +138,31 @@ export default function BudgetsPage() {
       return;
     }
 
+    const alertVal = Number.parseFloat(alertAtPercent);
+    if (!Number.isNaN(alertVal) && (alertVal <= 0 || alertVal > 99)) {
+      setModalState({
+        open: true,
+        type: 'error',
+        title: 'Invalid Alert Threshold',
+        message: 'Warning alert threshold must be between 1 and 99%.',
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      await updateBudget(selectedDeptId, val);
+      const tasks: Promise<unknown>[] = [updateBudget(selectedDeptId, val)];
+      if (!Number.isNaN(alertVal) && alertVal > 0) {
+        tasks.push(updateAlertThreshold(selectedDeptId, alertVal));
+      }
+      await Promise.all(tasks);
       await fetchBudgetsData();
       setOpenModal(false);
       setModalState({
         open: true,
         type: 'success',
         title: 'Budget Allocation Saved',
-        message: `Department budget has been updated to $${val.toLocaleString()} successfully.`,
+        message: `Department budget updated to $${val.toLocaleString()} with ${alertVal}% warning threshold.`,
       });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to update department budget.';
@@ -304,6 +323,8 @@ export default function BudgetsPage() {
         onDeptSelectChange={handleDeptSelectChange}
         newBudgetAmount={newBudgetAmount}
         onBudgetAmountChange={setNewBudgetAmount}
+        alertAtPercent={alertAtPercent}
+        onAlertAtPercentChange={setAlertAtPercent}
         onSave={handleSaveBudget}
         isSubmitting={isSubmitting}
       />

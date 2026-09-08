@@ -62,3 +62,37 @@ export async function getProjectBreakdown(id: string) {
   if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
   return res.json();
 }
+
+/** GET /api/settings — returns idle_threshold_days, system_cost_per_day, npv_discount_rate */
+export async function getSystemSettings() {
+  const res = await fetchWithAuth(`${API_BASE}/settings`);
+  if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+  return res.json() as Promise<{
+    idle_threshold_days: number;
+    system_cost_per_day: number;
+    npv_discount_rate: number;
+  }>;
+}
+
+/** PUT /api/settings/finance — update system_cost_per_day and/or npv_discount_rate */
+export async function updateFinanceSettings(data: {
+  system_cost_per_day?: number;
+  npv_discount_rate?: number;
+}) {
+  const res = await fetchWithAuth(`${API_BASE}/settings/finance`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+  return res.json();
+}
+
+/** PUT /api/budgets/alert-threshold — update per-department warning threshold */
+export async function updateAlertThreshold(id: number, alertAtPercent: number) {
+  const res = await fetchWithAuth(`${API_BASE}/budgets/alert-threshold`, {
+    method: 'PUT',
+    body: JSON.stringify({ id, alert_at_percent: alertAtPercent }),
+  });
+  if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+  return res.json();
+}

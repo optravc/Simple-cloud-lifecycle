@@ -111,7 +111,19 @@ export default function ReportsPage() {
       if (!cancelled) {
         setReportsData({
           status: 'success',
-          roi_summary: { WastedCostDaily: 141.66 },
+          roi_summary: {
+            WastedCostDaily: 141.66,
+            TotalSpentDaily: 0,
+            SavingsDaily: 0,
+            SavingsMonthly: 0,
+            WastePercent: 0,
+            ROIPercent: 0,
+            PaybackDays: -1,
+            SystemCostDaily: 5,
+            ActiveCount: 0,
+            IdleCount: 0,
+            SoftDeletedCount: 0,
+          },
           npv_analysis: [],
           cost_trend: [
             { month: 'Feb', aws: 21200, azure: 26500, gcp: 35000 },
