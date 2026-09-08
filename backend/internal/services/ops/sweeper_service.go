@@ -33,10 +33,36 @@ func InitSystemSettings(db *sql.DB) {
 		INSERT INTO system_settings (key, value, description)
 		VALUES ('idle_threshold_days', '14', 'Minimum idle days before an instance is flagged for sweep')
 		ON CONFLICT (key) DO NOTHING;
+
+		INSERT INTO system_settings (key, value, description)
+		VALUES ('system_cost_per_day', '5.0', 'Daily operating cost of the FinOps platform (USD), used in ROI calculation')
+		ON CONFLICT (key) DO NOTHING;
+
+		INSERT INTO system_settings (key, value, description)
+		VALUES ('npv_discount_rate', '0.05', 'Annual discount rate for NPV calculation (e.g. 0.05 = 5%)')
+		ON CONFLICT (key) DO NOTHING;
 	`)
 	if err != nil {
 		log.Printf("[System Settings] Warning: Failed to init system_settings table: %v", err)
 	}
+}
+
+// GetSettingFloat64 retrieves a float64 value from system_settings by key.
+// Returns defaultVal if the key is missing or cannot be parsed.
+func GetSettingFloat64(db *sql.DB, key string, defaultVal float64) float64 {
+	if db == nil {
+		return defaultVal
+	}
+	var valStr string
+	err := db.QueryRow("SELECT value FROM system_settings WHERE key = $1", key).Scan(&valStr)
+	if err != nil || valStr == "" {
+		return defaultVal
+	}
+	val, err := strconv.ParseFloat(valStr, 64)
+	if err != nil || val < 0 {
+		return defaultVal
+	}
+	return val
 }
 
 // GetEffectiveThreshold คืนค่า threshold จริงที่จะใช้ โดยดึงจาก DB หรือ Env Override

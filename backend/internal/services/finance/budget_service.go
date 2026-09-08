@@ -3,6 +3,7 @@ package finance
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -20,16 +21,17 @@ type ProjectBudget struct {
 }
 
 type DepartmentBudget struct {
-	ID         int             `json:"id"`
-	Name       string          `json:"name"`
-	Allocated  float64         `json:"allocated"`
-	Spent      float64         `json:"spent"`
-	Forecasted float64         `json:"forecasted"`
-	Owner      string          `json:"owner"`
-	Status     string          `json:"status"` // "OK", "Warning", "Critical"
-	Slack      string          `json:"slack"`
-	Email      string          `json:"email"`
-	Projects   []ProjectBudget `json:"projects"`
+	ID          int             `json:"id"`
+	Name        string          `json:"name"`
+	Allocated   float64         `json:"allocated"`
+	Spent       float64         `json:"spent"`
+	Forecasted  float64         `json:"forecasted"`
+	Owner       string          `json:"owner"`
+	AlertAt     float64         `json:"alertAt"`     // per-department warning threshold (%)
+	Status      string          `json:"status"`      // "OK", "Warning", "Critical"
+	Slack       string          `json:"slack"`
+	Email       string          `json:"email"`
+	Projects    []ProjectBudget `json:"projects"`
 }
 
 type TrendValue struct {
@@ -55,7 +57,7 @@ type teamContact struct {
 
 // fetchDepartmentsAndRoles loads and filters departments based on user permissions
 func fetchDepartmentsAndRoles(ctx context.Context, db *sql.DB) ([]DepartmentBudget, float64, error) {
-	deptRows, err := db.Query("SELECT id, name, COALESCE(budget, 0.0) FROM departments ORDER BY id ASC")
+	deptRows, err := db.Query("SELECT id, name, COALESCE(budget, 0.0), COALESCE(alert_at_percent, 80.0) FROM departments ORDER BY id ASC")
 	if err != nil {
 		log.Println("[Budget Service] Error querying departments:", err)
 		return nil, 0, err
@@ -70,10 +72,14 @@ func fetchDepartmentsAndRoles(ctx context.Context, db *sql.DB) ([]DepartmentBudg
 
 	for deptRows.Next() {
 		var dept DepartmentBudget
-		err := deptRows.Scan(&dept.ID, &dept.Name, &dept.Allocated)
+		err := deptRows.Scan(&dept.ID, &dept.Name, &dept.Allocated, &dept.AlertAt)
 		if err != nil {
 			log.Println("[Budget Service] Error scanning department:", err)
 			continue
+		}
+		// Ensure AlertAt has a valid value
+		if dept.AlertAt <= 0 {
+			dept.AlertAt = 80.0
 		}
 
 		// Filter departments if user has restrictions (lead/dev)
@@ -198,7 +204,7 @@ func processDepartmentBudget(dept *DepartmentBudget, teamContacts map[int]teamCo
 		dept.Forecasted = dept.Spent * 1.15
 	}
 
-	// 4. Determine status based on percentage used
+	// 4. Determine status based on percentage used vs per-department alert threshold
 	pct := 0.0
 	if dept.Allocated > 0 {
 		pct = (dept.Spent / dept.Allocated) * 100.0
@@ -206,7 +212,7 @@ func processDepartmentBudget(dept *DepartmentBudget, teamContacts map[int]teamCo
 
 	if pct >= 100.0 {
 		dept.Status = "Critical"
-	} else if pct >= 80.0 {
+	} else if pct >= dept.AlertAt {
 		dept.Status = "Warning"
 	} else {
 		dept.Status = "OK"
@@ -337,10 +343,11 @@ func UpdateDepartmentBudget(db *sql.DB, deptID int, newBudget float64) error {
 		return err
 	}
 
-	// Fetch updated department info and calculate status
+	// Fetch updated department info and calculate status using per-dept threshold
 	var deptName string
+	var alertAt float64
 	var totalSpent float64
-	err = db.QueryRow("SELECT name FROM departments WHERE id = $1", deptID).Scan(&deptName)
+	err = db.QueryRow("SELECT name, COALESCE(alert_at_percent, 80.0) FROM departments WHERE id = $1", deptID).Scan(&deptName, &alertAt)
 	if err == nil {
 		_ = db.QueryRow(`
 			SELECT COALESCE(SUM(pc.spend), 0.0) 
@@ -352,7 +359,7 @@ func UpdateDepartmentBudget(db *sql.DB, deptID int, newBudget float64) error {
 		status := "OK"
 		if newBudget > 0 && totalSpent > newBudget {
 			status = "Critical"
-		} else if newBudget > 0 && totalSpent > (newBudget*0.85) {
+		} else if newBudget > 0 && alertAt > 0 && totalSpent > (newBudget*(alertAt/100.0)) {
 			status = "Warning"
 		}
 
@@ -361,6 +368,21 @@ func UpdateDepartmentBudget(db *sql.DB, deptID int, newBudget float64) error {
 	}
 
 	return nil
+}
+
+// UpdateDepartmentAlertThreshold updates the per-department warning threshold (%)
+func UpdateDepartmentAlertThreshold(db *sql.DB, deptID int, alertAt float64) error {
+	if alertAt <= 0 || alertAt > 100 {
+		return fmt.Errorf("alertAt must be between 1 and 100, got %.2f", alertAt)
+	}
+	_, err := db.Exec(
+		"UPDATE departments SET alert_at_percent = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+		alertAt, deptID,
+	)
+	if err != nil {
+		log.Printf("[Budget Service] Failed to update alert threshold for dept %d: %v\n", deptID, err)
+	}
+	return err
 }
 
 func getDepartmentSlackChannel(deptName string) string {

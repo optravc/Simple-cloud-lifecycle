@@ -60,8 +60,15 @@ func InitCoreDatabaseSchema(db *sql.DB) {
 			name VARCHAR(100) NOT NULL UNIQUE,
 			code VARCHAR(50),
 			description TEXT,
+			budget NUMERIC(15, 2) DEFAULT 0,
+			alert_at_percent NUMERIC(5, 2) NOT NULL DEFAULT 80.0,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
+		// Migration: add columns to existing departments tables safely
+		`ALTER TABLE departments ADD COLUMN IF NOT EXISTS budget NUMERIC(15, 2) DEFAULT 0;`,
+		`ALTER TABLE departments ADD COLUMN IF NOT EXISTS alert_at_percent NUMERIC(5, 2) NOT NULL DEFAULT 80.0;`,
+
+
 		`CREATE TABLE IF NOT EXISTS projects (
 			id VARCHAR(50) PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,

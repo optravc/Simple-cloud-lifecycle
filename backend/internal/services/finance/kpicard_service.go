@@ -78,21 +78,8 @@ func get7DaysSavings(db *sql.DB) []float64 {
 			data = append(data, val)
 		}
 	}
-	// Fallback to active daily savings trend if database sweep table is empty
-	if len(data) == 0 || isSliceEveryZero(data) {
-		return []float64{9800, 10500, 11200, 11800, 12200, 12500, 12850}
-	}
+	// Return actual data (may be all zeros if no sweeps have occurred yet)
 	return data
-}
-
-// helper check if all elements in slice are zero
-func isSliceEveryZero(data []float64) bool {
-	for _, v := range data {
-		if v > 0 {
-			return false
-		}
-	}
-	return true
 }
 
 func getMTDSavings(db *sql.DB) float64 {
@@ -103,8 +90,8 @@ func getMTDSavings(db *sql.DB) float64 {
 		  AND date_trunc('month', swept_date) = date_trunc('month', CURRENT_DATE);
 	`
 	var total float64
-	if err := db.QueryRow(query).Scan(&total); err != nil || total == 0 {
-		return 12850.00
+	if err := db.QueryRow(query).Scan(&total); err != nil {
+		return 0
 	}
 	return total
 }

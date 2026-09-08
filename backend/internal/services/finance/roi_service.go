@@ -3,14 +3,16 @@ package finance
 import (
 	"automated-lifecycle/backend/internal/models"
 	"automated-lifecycle/backend/internal/services/ops"
+	"database/sql"
 	"strings"
 )
 
-// system cost per day for FinOps platform operations
-const SystemCostPerDay = 5.0
+// DefaultSystemCostPerDay is the fallback value when system_settings DB has no entry
+const DefaultSystemCostPerDay = 5.0
 
-// CalROI calculates Return on Investment and savings metrics for idle resources
-func CalROI(resource []models.CloudResource) models.ROIResult {
+// CalROI calculates Return on Investment and savings metrics for idle resources.
+// systemCostPerDay is read from DB (system_settings key: system_cost_per_day).
+func CalROI(resource []models.CloudResource, db *sql.DB) models.ROIResult {
 	var totalSpend float64
 	var wastedCost float64
 	var savingsDaily float64
@@ -18,7 +20,8 @@ func CalROI(resource []models.CloudResource) models.ROIResult {
 	idleCount := 0
 	softDeletedCount := 0
 
-	idleThreshold := ops.GetEffectiveThreshold(nil)
+	idleThreshold := ops.GetEffectiveThreshold(db)
+	systemCostPerDay := ops.GetSettingFloat64(db, "system_cost_per_day", DefaultSystemCostPerDay)
 
 	for _, r := range resource {
 		switch strings.ToLower(r.Status) {
@@ -42,15 +45,15 @@ func CalROI(resource []models.CloudResource) models.ROIResult {
 	if totalSpend > 0 {
 		wastePercent = (wastedCost / totalSpend) * 100.0
 	}
-	
+
 	roi := 0.0
-	if SystemCostPerDay > 0 {
-		roi = ((savingsDaily - SystemCostPerDay) / SystemCostPerDay) * 100.0
+	if systemCostPerDay > 0 {
+		roi = ((savingsDaily - systemCostPerDay) / systemCostPerDay) * 100.0
 	}
-	
+
 	paybackDays := -1.0
-	if savingsDaily > SystemCostPerDay {
-		paybackDays = SystemCostPerDay / (savingsDaily - SystemCostPerDay)
+	if savingsDaily > systemCostPerDay {
+		paybackDays = systemCostPerDay / (savingsDaily - systemCostPerDay)
 	}
 
 	return models.ROIResult{
@@ -61,7 +64,7 @@ func CalROI(resource []models.CloudResource) models.ROIResult {
 		WastePercent:     wastePercent,
 		ROIPercent:       roi,
 		PaybackDays:      paybackDays,
-		SystemCostDaily:  SystemCostPerDay,
+		SystemCostDaily:  systemCostPerDay,
 		ActiveCount:      activeCount,
 		IdleCount:        idleCount,
 		SoftDeletedCount: softDeletedCount,

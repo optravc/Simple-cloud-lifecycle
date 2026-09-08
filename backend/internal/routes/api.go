@@ -90,6 +90,10 @@ func Routes(db *sql.DB) *http.ServeMux {
 	mux.HandleFunc("/api/budgets/update", corsMiddleware(middleware.AuthMiddleware(
 		middleware.RequireRole([]string{"admin", "finance", "finops"}, handlers.UpdateBudgetHandler(db)),
 	)))
+	// ปรับ alert threshold per department สำหรับ Admin, FinOps
+	mux.HandleFunc("/api/budgets/alert-threshold", corsMiddleware(middleware.AuthMiddleware(
+		middleware.RequireRole([]string{"admin", "finops"}, handlers.UpdateAlertThresholdHandler(db)),
+	)))
 
 	// --- [Engineering / Sweeper Handlers] ---
 	// สั่งสแกน/แก้ไข สิทธิ์สำหรับผู้ดูแล Admin, FinOps และ Dev Lead
@@ -160,7 +164,10 @@ func Routes(db *sql.DB) *http.ServeMux {
 	mux.HandleFunc("/api/settings/idle-threshold", corsMiddleware(middleware.AuthMiddleware(
 		middleware.RequireRole([]string{"admin", "finops"}, handlers.UpdateThresholdHandler(db)),
 	)))
-
+	// ปรับค่า finance config (system_cost_per_day, npv_discount_rate) สำหรับ Admin, FinOps
+	mux.HandleFunc("/api/settings/finance", corsMiddleware(middleware.AuthMiddleware(
+		middleware.RequireRole([]string{"admin", "finops"}, handlers.UpdateFinanceSettingsHandler(db)),
+	)))
 
 
 	// (Optional) เปิด API บางเส้นให้เข้าถึงได้โดยไม่ต้อง Login เช่น /api/health

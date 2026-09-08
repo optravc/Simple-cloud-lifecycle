@@ -13,8 +13,9 @@ import (
 func handleGetReports(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	resources := ops.GetAllResources(r.Context(), db)
 
-	roiData := finance.CalROI(resources)
-	npvData := finance.CalNPVPerInstance(resources, 0.05)
+	discountRate := finance.GetDefaultDiscountRate(db)
+	roiData := finance.CalROI(resources, db)
+	npvData, npvSummary := finance.CalNPVPerInstance(resources, discountRate, db)
 	trendData, err := finance.GetCostTrendData(db)
 	if err != nil {
 		trendData = []finance.TrendItem{}
@@ -28,6 +29,7 @@ func handleGetReports(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		"status":            "success",
 		"roi_summary":       roiData,
 		"npv_analysis":      npvData,
+		"npv_summary":       npvSummary,
 		"cost_trend":        trendData,
 		"scheduled_reports": scheduledReports,
 	}
