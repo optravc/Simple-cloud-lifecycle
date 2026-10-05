@@ -28,6 +28,7 @@ resource "aws_sns_topic" "ses_notifications" {
   tags              = local.common_tags
 }
 
+/* 
 resource "aws_ses_identity_notification_topic" "bounce" {
   topic_arn                = aws_sns_topic.ses_notifications.arn
   notification_type        = "Bounce"
@@ -41,3 +42,4 @@ resource "aws_ses_identity_notification_topic" "complaint" {
   identity                 = aws_ses_email_identity.sender.email
   include_original_headers = false
 }
+*/

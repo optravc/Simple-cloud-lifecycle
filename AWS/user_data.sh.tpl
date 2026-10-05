@@ -126,7 +126,8 @@ rm -rf /opt/app/repo
 git clone https://github.com/optravc/Simple-cloud-lifecycle.git /opt/app/repo 2>&1
 cd /opt/app/repo
 
-# Copy .env to backend
+# Copy .env to root (for docker-compose) and backend
+cp /opt/app/.env .env
 cp /opt/app/.env backend/.env
 
 # ── ECR Login & Fast Deploy ────────────────────────────────────

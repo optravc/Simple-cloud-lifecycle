@@ -206,6 +206,9 @@ resource "aws_secretsmanager_secret_version" "backend_secrets" {
   secret_id = aws_secretsmanager_secret.backend_secrets.id
 
   secret_string = jsonencode({
+    DB_USER              = var.db_username
+    DB_PASSWORD          = var.db_password
+    DB_NAME              = var.db_name
     DB_URL               = "postgres://${var.db_username}:${var.db_password}@postgres:5432/${var.db_name}?sslmode=disable"
     AWS_REGION           = var.aws_region
     SES_SENDER_EMAIL     = var.ses_sender_email

@@ -233,13 +233,7 @@ func SeedDynamicDashboardStats(db *sql.DB) {
 		ON CONFLICT (record_date) DO NOTHING;
 	`)
 
-	// Seed sweep_tracking for last 14 days
-	_, _ = db.Exec(`
-		INSERT INTO sweep_tracking (resource_id, action_taken, saved_cost_per_day, swept_date)
-		SELECT 'i-auto-swept-' || dt::date, 'terminated', (850.00 + (random() * 200.00))::numeric(15,2), dt::date
-		FROM generate_series(CURRENT_DATE - INTERVAL '14 days', CURRENT_DATE, '1 day'::interval) AS dt
-		ON CONFLICT DO NOTHING;
-	`)
+	// Mock sweep_tracking removed — actual savings start from 0 and accumulate from real sweeps
 
 	log.Println("[Dashboard Seed] Dynamic daily stats seeded successfully.")
 }
