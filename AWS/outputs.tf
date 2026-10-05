@@ -97,20 +97,3 @@ output "cloudwatch_dashboard_url" {
 
 # ── Monthly Cost Estimate ─────────────────────────────────────
 
-output "estimated_monthly_cost" {
-  description = "Approximate monthly cost breakdown (USD)"
-  value       = <<-EOT
-    ┌────────────────────────────────────────────────┐
-    │ Estimated Monthly Cost (ap-southeast-1)        │
-    ├────────────────────────────────────────────────┤
-    │ EC2 t3.micro (1x)          ~$7.59/mo           │
-    │ RDS db.t3.micro (20GB)     ~$14.00/mo          │
-    │ ALB                        ~$16.00/mo           │
-    │ S3 + CloudWatch            ~$2.00/mo            │
-    │ Secrets Manager            ~$0.40/mo            │
-    ├────────────────────────────────────────────────┤
-    │ TOTAL                      ~$58/mo              │
-    │ (Covered by AWS Credit)                         │
-    └────────────────────────────────────────────────┘
-  EOT
-}
