@@ -97,7 +97,8 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
-# ── Application Load Balancer ─────────────────────────────────
+  /* For Alb Cost-Optimized */
+/* # ── Application Load Balancer ─────────────────────────────────
 
 # sonarqube:access_logs: ALB logging enabled
 resource "aws_lb" "main" { # NOSONAR
@@ -189,7 +190,7 @@ resource "aws_lb_listener_rule" "api" {
       values = ["/api/*", "/health"]
     }
   }
-}
+} */
 
 # ── Secrets Manager — Backend Environment ─────────────────────
 
@@ -205,7 +206,7 @@ resource "aws_secretsmanager_secret_version" "backend_secrets" {
   secret_id = aws_secretsmanager_secret.backend_secrets.id
 
   secret_string = jsonencode({
-    DB_URL               = "postgres://${var.db_username}:${var.db_password}@${aws_db_instance.main.address}:5432/${var.db_name}?sslmode=require"
+    DB_URL               = "postgres://${var.db_username}:${var.db_password}@postgres:5432/${var.db_name}?sslmode=disable"
     AWS_REGION           = var.aws_region
     SES_SENDER_EMAIL     = var.ses_sender_email
     FALLBACK_ADMIN_EMAIL = var.alarm_email

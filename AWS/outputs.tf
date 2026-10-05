@@ -19,8 +19,7 @@ output "private_subnet_ids" {
   value       = aws_subnet.private[*].id
 }
 
-# ── ALB ───────────────────────────────────────────────────────
-
+/* ── ALB & RDS Outputs (Cost-Optimized: Disabled) ─────────────
 output "alb_dns_name" {
   description = "ALB DNS name — ใช้เปิดเว็บ"
   value       = aws_lb.main.dns_name
@@ -36,8 +35,6 @@ output "api_url" {
   value       = "http://${aws_lb.main.dns_name}/api"
 }
 
-# ── RDS ───────────────────────────────────────────────────────
-
 output "rds_endpoint" {
   description = "RDS PostgreSQL endpoint"
   value       = aws_db_instance.main.address
@@ -48,6 +45,7 @@ output "rds_port" {
   description = "RDS PostgreSQL port"
   value       = aws_db_instance.main.port
 }
+*/
 
 # ── Cognito ───────────────────────────────────────────────────
 

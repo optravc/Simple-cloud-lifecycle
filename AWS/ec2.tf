@@ -85,10 +85,10 @@ resource "aws_autoscaling_group" "app" {
   }
 
   # ALB integration
-  target_group_arns = [
+  /* target_group_arns = [
     aws_lb_target_group.backend.arn,
     aws_lb_target_group.frontend.arn
-  ]
+  ] */
 
   # EC2 health check type prevents ASG from terminating instance while Docker builds
   health_check_type         = "EC2"
@@ -133,7 +133,8 @@ resource "aws_security_group" "app_server" {
   description = "Allow ALB traffic to app server (backend:8000 + frontend:3000)"
   vpc_id      = aws_vpc.main.id
 
-  # Frontend Web (port 3000) จาก ALB
+   /* For ALB  */
+ /*  # Frontend Web (port 3000) จาก ALB
   ingress {
     description     = "Frontend Web 3000 from ALB"
     from_port       = 3000
@@ -150,8 +151,17 @@ resource "aws_security_group" "app_server" {
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
+ */
 
-  # Outbound — ให้ออก internet ได้ (Docker pull, AWS APIs, etc.)
+   /* Nginx */
+   ingress {
+    description = "HTTP 80 from internet (Nginx)"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  # Outbound ออก internet ได้ (Docker pull, AWS APIs, etc.)
   egress {
     from_port   = 0
     to_port     = 0

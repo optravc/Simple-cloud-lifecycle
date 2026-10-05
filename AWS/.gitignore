@@ -4,8 +4,14 @@ terraform.tfstate
 terraform.tfstate.backup
 *.tfvars
 !*.tfvars.example
+full_stack_backup/
+old_state_backup/
+
 
 # Temporary / Output files
+script/
+scripts/
+*.disabled
 ssm_out.txt
 ssm_params.json
 .infracost/

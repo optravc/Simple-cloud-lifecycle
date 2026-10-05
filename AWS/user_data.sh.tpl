@@ -131,7 +131,7 @@ cp /opt/app/.env backend/.env
 
 # ── ECR Login & Fast Deploy ────────────────────────────────────
 echo "--- Logging in to AWS ECR ---"
-aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin 439855819034.dkr.ecr.ap-southeast-1.amazonaws.com
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin 010596578619.dkr.ecr.ap-southeast-2.amazonaws.com
 
 echo "--- Pulling pre-built images from ECR (Fast Deploy ~10s) ---"
 docker compose pull 2>&1 | tee /var/log/app/deploy.log
@@ -144,10 +144,10 @@ docker compose logs -f backend-api  > /var/log/app/backend.log  2>&1 &
 docker compose logs -f frontend-web > /var/log/app/frontend.log 2>&1 &
 
 # ── Health check loop — Backend API ──────────────────────────
-echo "--- Waiting for backend health check (port 8080) ---"
+echo "--- Waiting for backend health check (port 80) ---"
 MAX_RETRIES=36   # 36 x 10s = 6 minutes
 RETRY=0
-until curl -sf http://localhost:8080/health > /dev/null 2>&1; do
+until curl -sf http://localhost/health > /dev/null 2>&1; do
   RETRY=$((RETRY + 1))
   if [ $RETRY -ge $MAX_RETRIES ]; then
     echo "WARNING: Backend health check failed after $MAX_RETRIES attempts (non-fatal)"
