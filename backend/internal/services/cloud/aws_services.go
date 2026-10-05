@@ -614,7 +614,7 @@ func CreateEC2Instance(ctx context.Context, input CreateEC2InstanceInput) (strin
 	// Read AMI ID from env var (region-specific — override via AWS_EC2_AMI_ID in .env)
 	amiID := os.Getenv("AWS_EC2_AMI_ID")
 	if amiID == "" {
-		amiID = "ami-060e277c0d4cce553" // Default: Amazon Linux 2023 (ap-southeast-1)
+		amiID = "ami-083a7457bdb2d0548" // Default: Amazon Linux 2023 (ap-southeast-2 Sydney)
 	}
 	
 	var instType ec2types.InstanceType = ec2types.InstanceType(input.InstanceType)
