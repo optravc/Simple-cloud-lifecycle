@@ -1,5 +1,5 @@
  Application URL
-Access the live application from any web browser: 👉 http://scl-sandbox-alb-2027317152.ap-southeast-1.elb.amazonaws.com
+Access the live application from any web browser: 👉[ http://scl-sandbox-alb-2027317152.ap-southeast-1.elb.amazonaws.com http://54.252.146.170/](http://54.252.146.170/)
 
 🔑 Role-Based Access Control (RBAC) Credentials Matrix
 The system features granular Role-Based Access Control across 7 departments. Use the pre-configured test accounts below to test different user permissions:
