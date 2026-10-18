@@ -109,6 +109,14 @@ func parseTokenClaims(token *jwt.Token) (groups []string, dept string, email str
 	return
 }
 
+// extractRoleClaim extracts custom:role from claims or falls back to group mapping
+func extractRoleClaim(claims jwt.MapClaims, groups []string) string {
+	if customRole, ok := claims["custom:role"].(string); ok && customRole != "" {
+		return strings.ToLower(customRole)
+	}
+	return mapGroupsToRole(groups)
+}
+
 // mapGroupsToRole maps AWS Cognito groups to internal FinOps dashboard role
 func mapGroupsToRole(groups []string) string {
 	role := "dev"
@@ -157,8 +165,9 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		claims, _ := token.Claims.(jwt.MapClaims)
 		groups, dept, email := parseTokenClaims(token)
-		role := mapGroupsToRole(groups)
+		role := extractRoleClaim(claims, groups)
 
 		ctx := context.WithValue(r.Context(), UserRoleKey, role)
 		ctx = context.WithValue(ctx, UserGroupsKey, groups)

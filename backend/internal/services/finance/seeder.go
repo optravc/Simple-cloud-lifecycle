@@ -124,6 +124,23 @@ func InitCoreDatabaseSchema(db *sql.DB) {
 			swept_date DATE,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
+		`CREATE TABLE IF NOT EXISTS teams (
+			id SERIAL PRIMARY KEY,
+			team_name VARCHAR(100) NOT NULL UNIQUE,
+			contact_email VARCHAR(255) NOT NULL,
+			department_id INTEGER REFERENCES departments(id),
+			slack_channel VARCHAR(100),
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS audit_logs (
+			id SERIAL PRIMARY KEY,
+			user_email VARCHAR(255) NOT NULL,
+			action VARCHAR(100) NOT NULL,
+			target_resource VARCHAR(255),
+			details TEXT,
+			ip_address VARCHAR(100),
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
 	}
 
 	for _, q := range queries {
@@ -168,7 +185,37 @@ func InitCoreDatabaseSchema(db *sql.DB) {
 		_, _ = db.Exec(`INSERT INTO departments (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`, d)
 	}
 
-	log.Println("[Schema Init] Core database tables and 7 default departments initialized successfully.")
+	// Seed default teams for each department and role
+	type defaultTeam struct {
+		deptName     string
+		teamName     string
+		contactEmail string
+	}
+	defaultTeams := []defaultTeam{
+		{deptName: "Core Infrastructure", teamName: "Infra Core", contactEmail: "noptrapk+infra.lead@gmail.com"},
+		{deptName: "Core Infrastructure", teamName: "Infra Dev", contactEmail: "noptrapk+infra.dev@gmail.com"},
+		{deptName: "Product Engineering", teamName: "Frontend Web", contactEmail: "noptrapk+prod.lead@gmail.com"},
+		{deptName: "Product Engineering", teamName: "Backend Core", contactEmail: "noptrapk+prod.dev@gmail.com"},
+		{deptName: "Data Science & Analytics", teamName: "AI Research", contactEmail: "noptrapk+data.lead@gmail.com"},
+		{deptName: "Trust & Safety", teamName: "Fraud Detection", contactEmail: "noptrapk+trust.lead@gmail.com"},
+		{deptName: "Finance", teamName: "Billing & Invoicing", contactEmail: "noptrapk+finance@gmail.com"},
+		{deptName: "Executive / C-Level", teamName: "Executive Management", contactEmail: "noptrapk+executive@gmail.com"},
+		{deptName: "FinOps & Cloud Governance", teamName: "FinOps Automation", contactEmail: "noptrapk+finops@gmail.com"},
+	}
+
+	for _, dt := range defaultTeams {
+		var deptID int
+		err := db.QueryRow(`SELECT id FROM departments WHERE LOWER(name) = LOWER($1)`, dt.deptName).Scan(&deptID)
+		if err == nil {
+			_, _ = db.Exec(`
+				INSERT INTO teams (team_name, contact_email, department_id)
+				VALUES ($1, $2, $3)
+				ON CONFLICT (team_name) DO UPDATE SET contact_email = EXCLUDED.contact_email, department_id = EXCLUDED.department_id
+			`, dt.teamName, dt.contactEmail, deptID)
+		}
+	}
+
+	log.Println("[Schema Init] Core database tables, 7 default departments, and default teams initialized successfully.")
 }
 
 // InitScheduledReports creates and seeds scheduled_reports table
