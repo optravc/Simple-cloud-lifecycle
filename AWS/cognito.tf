@@ -50,6 +50,17 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
+  schema {
+    attribute_data_type      = "String"
+    name                     = "department"
+    mutable                  = true
+    required                 = false
+    string_attribute_constraints {
+      min_length = 1
+      max_length = 100
+    }
+  }
+
   # User Pool add-ons
   user_pool_add_ons {
     advanced_security_mode = "OFF" # sandbox — production: "ENFORCED"

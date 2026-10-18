@@ -37,6 +37,20 @@ variable "cost_center" {
   default     = "rd-department"
 }
 
+# ── Feature Flags (Cost Optimization vs Production) ──────────
+
+variable "enable_rds" {
+  description = "Set to true to provision AWS RDS PostgreSQL (Production), false to use local Docker PostgreSQL on EC2 (Sandbox ~$16/mo)"
+  type        = bool
+  default     = false
+}
+
+variable "enable_alb" {
+  description = "Set to true to provision AWS Application Load Balancer (Production), false to use Nginx on EC2 (Sandbox ~$16/mo)"
+  type        = bool
+  default     = false
+}
+
 # ── Lifecycle ───────────────────────────────────────────────
 
 variable "sandbox_expiry_days" {

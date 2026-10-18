@@ -97,15 +97,15 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
-  /* For Alb Cost-Optimized */
-/* # ── Application Load Balancer ─────────────────────────────────
+# ── Application Load Balancer (Production) ────────────────────
 
 # sonarqube:access_logs: ALB logging enabled
 resource "aws_lb" "main" { # NOSONAR
+  count              = var.enable_alb ? 1 : 0
   name               = "${local.name_prefix}-alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
+  security_groups    = [aws_security_group.alb[0].id]
   subnets            = aws_subnet.public[*].id
 
   access_logs {
@@ -121,6 +121,7 @@ resource "aws_lb" "main" { # NOSONAR
 
 # Target group: Backend (Go API → docker-compose port 8080 → container 8000)
 resource "aws_lb_target_group" "backend" {
+  count    = var.enable_alb ? 1 : 0
   name     = "${local.name_prefix}-tg-api"
   port     = 8080
   protocol = "HTTP"
@@ -143,6 +144,7 @@ resource "aws_lb_target_group" "backend" {
 
 # Target group: Frontend (Next.js port 3000)
 resource "aws_lb_target_group" "frontend" {
+  count    = var.enable_alb ? 1 : 0
   name     = "${local.name_prefix}-tg-web"
   port     = 3000
   protocol = "HTTP"
@@ -165,24 +167,26 @@ resource "aws_lb_target_group" "frontend" {
 
 # Listener: HTTP port 80 → Frontend
 resource "aws_lb_listener" "http" { # NOSONAR
-  load_balancer_arn = aws_lb.main.arn
+  count             = var.enable_alb ? 1 : 0
+  load_balancer_arn = aws_lb.main[0].arn
   port              = 80
   protocol          = "HTTP" # NOSONAR
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = aws_lb_target_group.frontend[0].arn
   }
 }
 
 # Listener Rule: /api/* → Backend
 resource "aws_lb_listener_rule" "api" {
-  listener_arn = aws_lb_listener.http.arn
+  count        = var.enable_alb ? 1 : 0
+  listener_arn = aws_lb_listener.http[0].arn
   priority     = 10
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.backend.arn
+    target_group_arn = aws_lb_target_group.backend[0].arn
   }
 
   condition {
@@ -190,7 +194,7 @@ resource "aws_lb_listener_rule" "api" {
       values = ["/api/*", "/health"]
     }
   }
-} */
+}
 
 # ── Secrets Manager — Backend Environment ─────────────────────
 
@@ -209,7 +213,7 @@ resource "aws_secretsmanager_secret_version" "backend_secrets" {
     DB_USER              = var.db_username
     DB_PASSWORD          = var.db_password
     DB_NAME              = var.db_name
-    DB_URL               = "postgres://${var.db_username}:${var.db_password}@postgres:5432/${var.db_name}?sslmode=disable"
+    DB_URL               = var.enable_rds ? "postgres://${var.db_username}:${var.db_password}@${aws_db_instance.main[0].endpoint}/${var.db_name}?sslmode=require" : "postgres://${var.db_username}:${var.db_password}@postgres:5432/${var.db_name}?sslmode=disable"
     AWS_REGION           = var.aws_region
     SES_SENDER_EMAIL     = var.ses_sender_email
     FALLBACK_ADMIN_EMAIL = var.alarm_email

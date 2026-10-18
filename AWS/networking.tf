@@ -82,8 +82,9 @@ resource "aws_route_table_association" "private" {
 
 # ── Security Groups ───────────────────────────────────────────
 
-# ALB — รับ traffic จาก internet
+# ALB — รับ traffic จาก internet (Production)
 resource "aws_security_group" "alb" {
+  count       = var.enable_alb ? 1 : 0
   name        = "${local.name_prefix}-sg-alb"
   description = "Allow inbound HTTP/HTTPS from internet to ALB"
   vpc_id      = aws_vpc.main.id
@@ -117,8 +118,9 @@ resource "aws_security_group" "alb" {
 # Backend + Frontend ถูกรวมอยู่ใน app_server SG (ec2.tf)
 # เพราะ docker-compose รันทั้ง backend และ frontend บน EC2 ตัวเดียวกัน
 
-# RDS — รับ connection จาก app server เท่านั้น
+# RDS — รับ connection จาก app server เท่านั้น (Production)
 resource "aws_security_group" "rds" {
+  count       = var.enable_rds ? 1 : 0
   name        = "${local.name_prefix}-sg-rds"
   description = "Allow PostgreSQL from app server only"
   vpc_id      = aws_vpc.main.id

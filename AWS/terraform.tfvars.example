@@ -11,6 +11,10 @@ environment   = "sandbox"
 owner_team    = "team-alpha"
 cost_center   = "rd-department"
 
+# ── Feature Flags (Sandbox: Cost-Optimized ~$16/mo vs Production: Full AWS) ─
+enable_rds = false # false = ใช้ Docker PostgreSQL บน EC2 (งบ $16/mo), true = ใช้ AWS RDS (Production)
+enable_alb = false # false = ใช้ Nginx บน EC2 (งบ $16/mo), true = ใช้ AWS ALB (Production)
+
 # ── Lifecycle ─────────────────────────────────────────────────
 sandbox_expiry_days = 14
 

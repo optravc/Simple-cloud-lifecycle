@@ -41,7 +41,7 @@ resource "aws_launch_template" "app" {
   }
 
   # User data — install Docker, clone repo, run docker-compose
-  user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", {
+  user_data = base64encode(templatefile("${path.module}/scripts/templates/user_data.sh.tpl", {
     aws_region     = var.aws_region
     project_name   = var.project_name
     environment    = var.environment
@@ -84,11 +84,11 @@ resource "aws_autoscaling_group" "app" {
     version = "$Latest"
   }
 
-  # ALB integration
-  /* target_group_arns = [
-    aws_lb_target_group.backend.arn,
-    aws_lb_target_group.frontend.arn
-  ] */
+  # ALB integration (Production)
+  target_group_arns = var.enable_alb ? [
+    aws_lb_target_group.backend[0].arn,
+    aws_lb_target_group.frontend[0].arn
+  ] : []
 
   # EC2 health check type prevents ASG from terminating instance while Docker builds
   health_check_type         = "EC2"
@@ -133,34 +133,30 @@ resource "aws_security_group" "app_server" {
   description = "Allow ALB traffic to app server (backend:8000 + frontend:3000)"
   vpc_id      = aws_vpc.main.id
 
-   /* For ALB  */
- /*  # Frontend Web (port 3000) จาก ALB
-  ingress {
-    description     = "Frontend Web 3000 from ALB"
-    from_port       = 3000
-    to_port         = 3000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
+  # HTTP 80 from internet (สำหรับโหมด Sandbox ที่ไม่มี ALB ใช้ Nginx)
+  dynamic "ingress" {
+    for_each = var.enable_alb ? [] : [80]
+    content {
+      description = "HTTP 80 from internet (Nginx)"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
   }
 
-  # Backend API (port 8080) จาก ALB — docker-compose maps 8080(host)→8000(container)
-  ingress {
-    description     = "Backend API 8080 from ALB"
-    from_port       = 8080
-    to_port         = 8080
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
+  # Traffic from ALB (สำหรับโหมด Production ที่มี ALB)
+  dynamic "ingress" {
+    for_each = var.enable_alb ? [3000, 8080] : []
+    content {
+      description     = "Traffic from ALB (port ${ingress.value})"
+      from_port       = ingress.value
+      to_port         = ingress.value
+      protocol        = "tcp"
+      security_groups = [aws_security_group.alb[0].id]
+    }
   }
- */
 
-   /* Nginx */
-   ingress {
-    description = "HTTP 80 from internet (Nginx)"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
   # Outbound ออก internet ได้ (Docker pull, AWS APIs, etc.)
   egress {
     from_port   = 0

@@ -19,33 +19,28 @@ output "private_subnet_ids" {
   value       = aws_subnet.private[*].id
 }
 
-/* ── ALB & RDS Outputs (Cost-Optimized: Disabled) ─────────────
+# ── ALB & RDS Outputs (Dynamic by Feature Flag) ──────────────
+
 output "alb_dns_name" {
-  description = "ALB DNS name — ใช้เปิดเว็บ"
-  value       = aws_lb.main.dns_name
+  description = "ALB DNS name — ใช้เปิดเว็บ (Production)"
+  value       = var.enable_alb ? aws_lb.main[0].dns_name : "Disabled (Using EC2 Nginx in Sandbox)"
 }
 
 output "app_url" {
   description = "Application URL (frontend)"
-  value       = "http://${aws_lb.main.dns_name}"
+  value       = var.enable_alb ? "http://${aws_lb.main[0].dns_name}" : "http://<EC2-Public-IP>"
 }
 
 output "api_url" {
   description = "Backend API URL"
-  value       = "http://${aws_lb.main.dns_name}/api"
+  value       = var.enable_alb ? "http://${aws_lb.main[0].dns_name}/api" : "http://<EC2-Public-IP>/api"
 }
 
 output "rds_endpoint" {
   description = "RDS PostgreSQL endpoint"
-  value       = aws_db_instance.main.address
-  sensitive   = true
+  value       = var.enable_rds ? aws_db_instance.main[0].address : "Disabled (Using Docker PostgreSQL on EC2)"
+  sensitive   = false
 }
-
-output "rds_port" {
-  description = "RDS PostgreSQL port"
-  value       = aws_db_instance.main.port
-}
-*/
 
 # ── Cognito ───────────────────────────────────────────────────
 
