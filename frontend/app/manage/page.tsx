@@ -188,14 +188,14 @@ export default function ManagePage() {
       if (info.department) setUserDept(info.department);
       setIsAuthorized(true);
 
-      loadResources();
-      loadTeams();
-      loadDepartments();
-      loadSettings();
+      void loadResources();
+      void loadTeams();
+      void loadDepartments();
+      void loadSettings();
       await loadSavedSummary();
     };
 
-    checkAuthAndLoad();
+    void checkAuthAndLoad();
 
     return () => {
       cancelled = true;

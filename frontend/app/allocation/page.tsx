@@ -75,7 +75,7 @@ export default function CostAllocationPage() {
       }
     };
 
-    loadAllocationData();
+    void loadAllocationData();
 
     return () => {
       cancelled = true;

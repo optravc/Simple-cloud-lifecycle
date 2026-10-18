@@ -7,11 +7,17 @@ import (
 	"net/http"
 )
 
+const (
+	errMethodNotAllowed = "Method not allowed"
+	headerContentType   = "Content-Type"
+	mimeApplicationJSON = "application/json"
+)
+
 // GetBudgetsHandler returns the cloud budget dashboard metrics
 func GetBudgetsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, errMethodNotAllowed, http.StatusMethodNotAllowed)
 			return
 		}
 
@@ -21,7 +27,7 @@ func GetBudgetsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, mimeApplicationJSON)
 		json.NewEncoder(w).Encode(data)
 	}
 }
@@ -30,7 +36,7 @@ func GetBudgetsHandler(db *sql.DB) http.HandlerFunc {
 func UpdateBudgetHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, errMethodNotAllowed, http.StatusMethodNotAllowed)
 			return
 		}
 
@@ -55,7 +61,7 @@ func UpdateBudgetHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, mimeApplicationJSON)
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "success",

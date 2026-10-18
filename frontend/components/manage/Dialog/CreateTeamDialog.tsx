@@ -49,11 +49,13 @@ export default function CreateTeamDialog({
   React.useEffect(() => {
     if (departments && departments.length > 0 && !newTeamDeptID) {
       const firstDeptId = departments[0].id;
-      setNewTeamDeptID(firstDeptId);
       const available = PRESET_EMAILS_BY_DEPT[firstDeptId] || [];
-      if (available.length > 0) {
-        setNewTeamEmail(available[0].email);
-      }
+      queueMicrotask(() => {
+        setNewTeamDeptID(firstDeptId);
+        if (available.length > 0) {
+          setNewTeamEmail(available[0].email);
+        }
+      });
     }
   }, [departments, newTeamDeptID]);
 

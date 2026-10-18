@@ -26,7 +26,7 @@ export default function LaunchServerDialog({
 
   // Sync selectedTeam with first team if teams list updates
   useEffect(() => {
-    const initializeTeam = async () => {
+    const initializeTeam = () => {
       if (teams && teams.length > 0 && !selectedTeam) {
         setSelectedTeam(teams[0].team_name);
       }

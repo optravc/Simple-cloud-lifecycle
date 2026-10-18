@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [anomalyLoading, setAnomalyLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuth = () => {
       const token = localStorage.getItem('accessToken');
       if (!token) {
         router.push('/login');
@@ -72,7 +72,7 @@ export default function DashboardPage() {
         if (!cancelled) setAnomalyLoading(false);
       }
     };
-    fetchAnomalies();
+    void fetchAnomalies();
     return () => { cancelled = true; };
   }, []);
 
@@ -109,7 +109,7 @@ export default function DashboardPage() {
       }
     };
 
-    fetchDashboardStats();
+    void fetchDashboardStats();
 
     return () => { cancelled = true; };
   }, []);
@@ -128,7 +128,7 @@ export default function DashboardPage() {
         console.error("Error fetching allocation data:", err);
       }
     };
-    loadAllocationData();
+    void loadAllocationData();
     return () => { cancelled = true; };
   }, [selectedDept]);
 

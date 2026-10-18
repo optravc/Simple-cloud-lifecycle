@@ -39,7 +39,7 @@ export default function Sidebar() {
   const [userInitials, setUserInitials] = useState<string>('U');
 
   useEffect(() => {
-    const loadUserInfo = async () => {
+    const loadUserInfo = () => {
       const info = getUserInfo();
       if (info) {
         setUserRole(info.role);

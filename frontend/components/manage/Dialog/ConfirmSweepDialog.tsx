@@ -46,9 +46,7 @@ export default function ConfirmSweepDialog({ open,
       .filter((inst) => {
         const found = resources.find((r) => r.ID === inst.ID || r.Name === inst.Name);
         const status = found ? found.Status : inst.Status;
-        const env = (found?.Environment || inst.Environment || '').toLowerCase();
         const name = (found?.Name || inst.Name || '').toLowerCase();
-        const id = (found?.ID || inst.ID || '').toLowerCase();
 
         const isProtected = name.includes('app-server') || name.includes('scl-sandbox');
         return status === 'ACTIVE' && !isProtected;
@@ -57,7 +55,7 @@ export default function ConfirmSweepDialog({ open,
 
   // Initialize and clear values
   useEffect(() => {
-    const initializeSettings = async () => {
+    const initializeSettings = () => {
       if (open && normalizedInstances.length > 0) {
         setConfirmText('');
         const initialSettings: Record<string, InstanceSweepSetting> = {};
@@ -75,7 +73,7 @@ export default function ConfirmSweepDialog({ open,
         setRowSettings({});
       }
     };
-    initializeSettings();
+    void initializeSettings();
   }, [open, normalizedInstances]);
 
   const updateSetting = <K extends keyof InstanceSweepSetting>(
@@ -121,7 +119,7 @@ export default function ConfirmSweepDialog({ open,
         }}>
           <CheckCircleOutlineIcon sx={{ color: '#2ea043', fontSize: 36 }} />
           <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2ea043' }}>
-            No instances found Idle for more than {effectiveThreshold === 0 ? '0 days (Instant Demo Mode)' : `${effectiveThreshold} ${effectiveThreshold === 1 ? 'day' : 'days'}`}
+            No instances found Idle for more than {effectiveThreshold === 0 ? '0 days (Instant Demo Mode)' : `${effectiveThreshold} day${effectiveThreshold === 1 ? '' : 's'}`}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
             All instances in the system are within lifecycle limits — no action required

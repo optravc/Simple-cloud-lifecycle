@@ -129,7 +129,7 @@ export default function CostBreakdownCard({
         console.error('Error fetching dynamic cost breakdown:', err);
       }
     }
-    fetchChargesBreakdown();
+    void fetchChargesBreakdown();
     return () => { cancelled = true; };
   }, [data]);
 
@@ -156,13 +156,13 @@ export default function CostBreakdownCard({
     return lname.includes('infrastructure') || lname.includes('engineering') || lname.includes('analytics') || lname.includes('safety') || lname.includes('governance');
   });
 
-  const cardTitle = selectedDept !== 'All' 
-    ? `${selectedDept} Service Breakdown`
-    : (isDeptData ? 'Department Cost Allocation' : 'Cloud Provider Cost Share');
+  let cardTitle = `${selectedDept} Service Breakdown`;
+  let cardSubtitle = `Cost breakdown for ${selectedDept} cloud services`;
 
-  const cardSubtitle = selectedDept !== 'All'
-    ? `Cost breakdown for ${selectedDept} cloud services`
-    : (isDeptData ? 'Expenditure breakdown by business department' : 'Multi-cloud vendor expenditure breakdown');
+  if (selectedDept === 'All') {
+    cardTitle = isDeptData ? 'Department Cost Allocation' : 'Cloud Provider Cost Share';
+    cardSubtitle = isDeptData ? 'Expenditure breakdown by business department' : 'Multi-cloud vendor expenditure breakdown';
+  }
 
   return (
     <Card 

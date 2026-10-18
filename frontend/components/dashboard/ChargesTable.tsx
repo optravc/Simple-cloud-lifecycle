@@ -62,7 +62,7 @@ export default function ChargesTable() {
       }
     };
 
-    fetchCharges();
+    void fetchCharges();
 
     return () => {
       cancelled = true;

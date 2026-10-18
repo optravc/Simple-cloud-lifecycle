@@ -64,7 +64,7 @@ export default function ProjectDetailModal({
       }
     };
 
-    fetchProjectBreakdown();
+    void fetchProjectBreakdown();
   }, [project]);
 
   if (!project) return null;

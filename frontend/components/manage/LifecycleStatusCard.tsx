@@ -38,7 +38,7 @@ export default function LifecycleStatusCard() {
       }
     };
 
-    fetchPending();
+    void fetchPending();
   }, []);
 
   const formatDeadline = (dateStr: string) => {

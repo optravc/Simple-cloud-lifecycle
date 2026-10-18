@@ -56,7 +56,7 @@ export default function TerminatedHistoryTable() {
       }
     };
 
-    fetchHistory();
+    void fetchHistory();
   }, []);
 
   const formatDate = (dateStr?: string) => {

@@ -83,7 +83,7 @@ export default function BudgetsPage() {
       await fetchBudgetsData();
     };
 
-    checkAuthAndLoad();
+    void checkAuthAndLoad();
   }, [router, fetchBudgetsData]);
 
   const handleOpenAdjustModal = (deptId?: number) => {

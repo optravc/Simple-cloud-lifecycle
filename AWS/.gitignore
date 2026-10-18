@@ -9,8 +9,6 @@ old_state_backup/
 
 
 # Temporary / Output files
-script/
-scripts/
 *.disabled
 ssm_out.txt
 ssm_params.json

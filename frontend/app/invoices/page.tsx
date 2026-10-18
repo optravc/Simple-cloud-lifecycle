@@ -39,7 +39,7 @@ export default function InvoicesPage() {
 
   // Authentication check
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuth = () => {
       const info = getUserInfo();
       if (info) {
         if (info.role !== 'admin' && info.role !== 'finance' && info.role !== 'finops') {
@@ -69,7 +69,7 @@ export default function InvoicesPage() {
         setCostTrends(trendData);
       }
     }
-    loadData();
+    void loadData();
     return () => { active = false; };
   }, []);
 

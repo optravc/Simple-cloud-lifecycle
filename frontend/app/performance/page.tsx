@@ -48,7 +48,7 @@ export default function PerformancePage() {
         await fetchData();
       }
     }
-    load();
+    void load();
     return () => { active = false; };
   }, [fetchData]);
 

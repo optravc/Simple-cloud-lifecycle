@@ -55,7 +55,7 @@ export default function ReportsPage() {
 
   // Check login & permissions
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuth = () => {
       const info = getUserInfo();
       if (info) {
         if (info.role === 'dev') {
@@ -86,7 +86,7 @@ export default function ReportsPage() {
         if (!cancelled) setSavingsLoading(false);
       }
     };
-    fetchSavingsPlans();
+    void fetchSavingsPlans();
     return () => { cancelled = true; };
   }, []);
 
@@ -144,7 +144,7 @@ export default function ReportsPage() {
       }
     };
 
-    fetchReports();
+    void fetchReports();
     return () => {
       cancelled = true;
     };
